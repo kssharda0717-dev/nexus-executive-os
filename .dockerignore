@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+nexus.db
+nexus.db-wal
+nexus.db-shm
+.git/
+.gitignore
+*.md
+test_*.py

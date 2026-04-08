@@ -1,0 +1,3088 @@
+<!DOCTYPE html>
+<html lang="en" class="antialiased">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NEXUS — Executive Command Center</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Manrope', 'Inter', 'system-ui', 'sans-serif'],
+            display: ['Manrope', 'system-ui', 'sans-serif'],
+            label: ['Space Grotesk', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+          },
+          colors: { obsidian: '#050505', agentGlow: '#6366f1' },
+        },
+      },
+    };
+  </script>
+
+  <!-- Fonts: Manrope (headlines), Space Grotesk (labels), Inter (body), JetBrains Mono (code) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600&family=Inter:wght@200;300;400;500;600&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ── Base ─────────────────────────────────── */
+    body { background: #050505; }
+    ::selection { background: rgba(99,102,241,0.3); color: #e2e8f0; }
+
+    /* ── Agent Pulse ─────────────────────────── */
+    @keyframes pulseAgent {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(99,102,241,0.6); }
+      50% { box-shadow: 0 0 8px 3px rgba(99,102,241,0); }
+    }
+    .agent-active .agent-dot {
+      background: #6366f1 !important;
+      animation: pulseAgent 1.5s ease-in-out infinite;
+    }
+
+    /* ── Command Glow ────────────────────────── */
+    @keyframes cmdGlow {
+      0%, 100% { box-shadow: 0 0 20px 0 rgba(99,102,241,0.08); }
+      50% { box-shadow: 0 0 40px 4px rgba(99,102,241,0.15); }
+    }
+    .cmd-processing { animation: cmdGlow 2s ease-in-out infinite; }
+
+    /* ── Typewriter Cursor ───────────────────── */
+    .narration-typing::after {
+      content: '\2502';
+      color: #6366f1;
+      animation: blink 1s step-end infinite;
+      margin-left: 1px;
+      font-weight: 200;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* ── Narration Fade ──────────────────────── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .narration-enter { animation: fadeUp 0.3s ease-out; }
+
+    /* ── Scrollbars ──────────────────────────── */
+    .scroll-thin::-webkit-scrollbar { width: 3px; }
+    .scroll-thin::-webkit-scrollbar-track { background: transparent; }
+    .scroll-thin::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+    .scroll-thin::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
+
+    /* ── Trace Entry Slide ───────────────────── */
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(-8px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    .trace-entry { animation: slideIn 0.2s ease-out; }
+
+    /* ── Glass ────────────────────────────────── */
+    .glass {
+      backdrop-filter: blur(24px) saturate(140%);
+      -webkit-backdrop-filter: blur(24px) saturate(140%);
+    }
+
+    /* ── Tile Hover ──────────────────────────── */
+    .bento-tile { transition: border-color 0.3s ease; }
+    .bento-tile:hover { border-color: rgba(255,255,255,0.12); }
+
+    /* ── Loading Dots ────────────────────────── */
+    @keyframes loadDot {
+      0%, 80%, 100% { opacity: 0.2; }
+      40% { opacity: 1; }
+    }
+    .load-dot:nth-child(1) { animation: loadDot 1.4s 0s infinite; }
+    .load-dot:nth-child(2) { animation: loadDot 1.4s 0.2s infinite; }
+    .load-dot:nth-child(3) { animation: loadDot 1.4s 0.4s infinite; }
+
+    /* ── WS Status Dot ───────────────────────── */
+    @keyframes wsAlive {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .ws-connected { animation: wsAlive 3s ease-in-out infinite; }
+
+    /* ── Document Viewer Overlay ────────────── */
+    @keyframes overlayIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    @keyframes panelSlideUp {
+      from { opacity: 0; transform: translateY(24px) scale(0.98); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes overlayOut {
+      from { opacity: 1; }
+      to   { opacity: 0; }
+    }
+    @keyframes panelSlideDown {
+      from { opacity: 1; transform: translateY(0) scale(1); }
+      to   { opacity: 0; transform: translateY(24px) scale(0.98); }
+    }
+    .doc-overlay-enter { animation: overlayIn 0.25s ease-out forwards; }
+    .doc-panel-enter  { animation: panelSlideUp 0.3s cubic-bezier(0.16,1,0.3,1) forwards; }
+    .doc-overlay-exit  { animation: overlayOut 0.2s ease-in forwards; }
+    .doc-panel-exit   { animation: panelSlideDown 0.2s ease-in forwards; }
+
+    /* ── Markdown Prose ─────────────────────── */
+    .doc-prose { line-height: 1.75; }
+    .doc-prose h1 { font-size: 1.5em; font-weight: 600; color: #e2e8f0; margin: 1.5em 0 0.5em; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 0.3em; }
+    .doc-prose h2 { font-size: 1.25em; font-weight: 600; color: #cbd5e1; margin: 1.3em 0 0.4em; }
+    .doc-prose h3 { font-size: 1.1em; font-weight: 500; color: #94a3b8; margin: 1em 0 0.3em; }
+    .doc-prose h4 { font-size: 1em; font-weight: 500; color: #94a3b8; margin: 0.8em 0 0.3em; }
+    .doc-prose p  { margin: 0.6em 0; color: #94a3b8; }
+    .doc-prose ul, .doc-prose ol { margin: 0.5em 0; padding-left: 1.5em; color: #94a3b8; }
+    .doc-prose li { margin: 0.25em 0; }
+    .doc-prose li::marker { color: rgba(99,102,241,0.5); }
+    .doc-prose strong { color: #cbd5e1; font-weight: 600; }
+    .doc-prose em { color: #a5b4c8; }
+    .doc-prose code { font-family: 'JetBrains Mono', monospace; font-size: 0.85em; background: rgba(255,255,255,0.06); padding: 0.15em 0.4em; border-radius: 4px; color: #c4b5fd; }
+    .doc-prose pre { background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 1em; margin: 0.8em 0; overflow-x: auto; }
+    .doc-prose pre code { background: none; padding: 0; font-size: 0.82em; color: #94a3b8; }
+    .doc-prose blockquote { border-left: 3px solid rgba(99,102,241,0.3); padding-left: 1em; margin: 0.8em 0; color: #64748b; font-style: italic; }
+    .doc-prose hr { border: none; border-top: 1px solid rgba(255,255,255,0.06); margin: 1.5em 0; }
+    .doc-prose a { color: #818cf8; text-decoration: underline; text-underline-offset: 2px; }
+    .doc-prose table { width: 100%; border-collapse: collapse; margin: 0.8em 0; font-size: 0.9em; }
+    .doc-prose th { text-align: left; padding: 0.5em 0.75em; border-bottom: 2px solid rgba(255,255,255,0.1); color: #cbd5e1; font-weight: 500; }
+    .doc-prose td { padding: 0.4em 0.75em; border-bottom: 1px solid rgba(255,255,255,0.04); color: #94a3b8; }
+    .doc-prose tr:hover td { background: rgba(255,255,255,0.02); }
+
+    /* ── Note Card Actions ──────────────────── */
+    .note-actions-trigger { opacity: 0; transition: opacity 0.15s ease; }
+    .group:hover .note-actions-trigger { opacity: 1; }
+    .note-card-clickable { cursor: pointer; }
+    .note-card-clickable:active { transform: scale(0.995); }
+
+    /* ── Toast ──────────────────────────────── */
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes toastOut {
+      from { opacity: 1; transform: translateY(0); }
+      to   { opacity: 0; transform: translateY(12px); }
+    }
+    .toast-enter { animation: toastIn 0.25s ease-out forwards; }
+    .toast-exit  { animation: toastOut 0.2s ease-in forwards; }
+
+    /* ── Task Removal Animation ───────────────── */
+    @keyframes taskFadeOut {
+      from { opacity: 1; max-height: 80px; }
+      to   { opacity: 0; max-height: 0; padding: 0; margin: 0; overflow: hidden; }
+    }
+    .task-removing { animation: taskFadeOut 0.35s ease-in forwards; }
+
+    /* ── Task Action Buttons ──────────────────── */
+    .task-actions-trash { opacity: 0; transition: opacity 0.15s ease; }
+    .group:hover .task-actions-trash { opacity: 1; }
+
+    /* ── Voice Input Pulse ──────────────────── */
+    @keyframes voicePulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(139,92,246,0.5); }
+      50% { box-shadow: 0 0 12px 4px rgba(139,92,246,0.3); }
+    }
+    .voice-active {
+      animation: voicePulse 1.2s ease-in-out infinite;
+      color: #a78bfa !important;
+      background: rgba(139,92,246,0.15) !important;
+    }
+
+    /* ── Neural Link Overlay — Glassmorphism ── */
+    .neural-link-glass {
+      backdrop-filter: blur(32px) saturate(160%);
+      -webkit-backdrop-filter: blur(32px) saturate(160%);
+      background: rgba(10,10,10,0.85);
+    }
+    .close-rotate { transition: transform 0.25s ease; }
+    .close-rotate:hover { transform: rotate(90deg); }
+
+    /* ── Search Trace Icon Pulse ──────────────── */
+    @keyframes searchPulse {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 1; }
+    }
+
+    /* ── Live Reasoning Collapsed Pulse ────────── */
+    @keyframes reasonPulse {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 1; }
+    }
+    .reason-pulse { animation: reasonPulse 2s ease-in-out infinite; }
+    .reasoning-step { animation: slideIn 0.25s ease-out; }
+    .reasoning-stepper::before {
+      content: '';
+      position: absolute;
+      left: 11px;
+      top: 0;
+      bottom: 0;
+      width: 1px;
+      background: linear-gradient(to bottom, rgba(99,102,241,0.2), transparent);
+    }
+
+    /* ── Date Strip ────────────────────────────── */
+    .date-chip {
+      transition: all 0.15s ease;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .date-chip:hover, .date-chip.active {
+      background: rgba(99,102,241,0.12);
+      border-color: rgba(99,102,241,0.3);
+      color: #a5b4fc;
+    }
+
+    /* ── Timeline Accordion ────────────────────── */
+    .tl-group-toggle { cursor: pointer; user-select: none; }
+    .tl-group-toggle:hover { color: #94a3b8; }
+    .tl-group-body { transition: max-height 0.3s ease, opacity 0.2s ease; overflow: hidden; }
+    .tl-group-body.collapsed { max-height: 0 !important; opacity: 0; }
+
+    /* ── Task Highlight Glow ──────────────────── */
+    @keyframes taskHighlight {
+      0% { box-shadow: 0 0 0 0 rgba(234,179,8,0.4); }
+      50% { box-shadow: 0 0 12px 4px rgba(234,179,8,0.15); }
+      100% { box-shadow: 0 0 0 0 transparent; }
+    }
+    .task-highlighted { animation: taskHighlight 2s ease-out; border-color: rgba(234,179,8,0.3) !important; }
+
+    /* ── Knowledge Hub View Modes ─────────────── */
+    .kb-list-view .note-card-clickable { display: flex; align-items: center; gap: 12px; padding: 10px 14px; }
+    .kb-list-view .note-card-clickable p { display: none; }
+    .kb-list-view .note-card-clickable .note-meta-footer { display: none; }
+
+    /* ── Urgency DNA Quick-Tag HUD ────────────── */
+    @keyframes hudSlideIn {
+      from { opacity: 0; transform: translateY(-8px) scale(0.95); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes hudSlideOut {
+      from { opacity: 1; transform: translateY(0) scale(1); }
+      to   { opacity: 0; transform: translateY(-8px) scale(0.95); }
+    }
+    .urgency-hud-enter { animation: hudSlideIn 0.2s ease-out forwards; }
+    .urgency-hud-exit  { animation: hudSlideOut 0.15s ease-in forwards; }
+    .urgency-chip {
+      cursor: pointer;
+      transition: all 0.15s ease;
+      user-select: none;
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+    }
+    .urgency-chip:hover { transform: scale(1.05); }
+    .urgency-chip.selected { transform: scale(1.08); box-shadow: 0 0 12px 2px var(--chip-glow); }
+
+    /* ── Urgency Indicator Dot (Timeline) ────── */
+    .urgency-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .urgency-async    { background: #22c55e; box-shadow: 0 0 4px rgba(34,197,94,0.4); }
+    .urgency-standard { background: #f59e0b; box-shadow: 0 0 4px rgba(245,158,11,0.4); }
+    .urgency-critical { background: #ef4444; box-shadow: 0 0 6px rgba(239,68,68,0.5); animation: criticalPulse 2s ease-in-out infinite; }
+    @keyframes criticalPulse {
+      0%, 100% { box-shadow: 0 0 4px rgba(239,68,68,0.3); }
+      50% { box-shadow: 0 0 10px rgba(239,68,68,0.6); }
+    }
+
+    /* ── Urgency Picker on Task Card ─────────── */
+    .urgency-picker { opacity: 0; transition: opacity 0.2s ease; pointer-events: none; }
+    .group:hover .urgency-picker { opacity: 1; pointer-events: auto; }
+
+    /* ── Frequency Picker Portal (body-level, never clipped) ── */
+    .freq-portal {
+      position: fixed;
+      z-index: 9999;
+      min-width: 220px;
+      max-height: 420px;
+      overflow-y: auto;
+      backdrop-filter: blur(32px) saturate(160%);
+      -webkit-backdrop-filter: blur(32px) saturate(160%);
+      background: rgba(8,8,12,0.88);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 14px;
+      padding: 6px;
+      box-shadow: 0 12px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04);
+      opacity: 0;
+      transform: translateY(-6px) scale(0.96);
+      pointer-events: none;
+      transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+    .freq-portal::-webkit-scrollbar { width: 3px; }
+    .freq-portal::-webkit-scrollbar-track { background: transparent; }
+    .freq-portal::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+    .freq-portal.open {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      pointer-events: auto;
+    }
+    .freq-section-label {
+      padding: 6px 10px 3px;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #475569;
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-weight: 500;
+      user-select: none;
+    }
+    .freq-divider {
+      height: 1px;
+      background: rgba(255,255,255,0.05);
+      margin: 4px 8px;
+    }
+    .freq-option {
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 10px;
+      border-radius: 8px;
+      font-size: 11px;
+      color: #94a3b8;
+      cursor: pointer;
+      transition: all 0.12s ease;
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+    }
+    .freq-option:hover { background: rgba(255,255,255,0.06); color: #e2e8f0; }
+    .freq-option.active { color: #a5b4fc; background: rgba(99,102,241,0.12); }
+    .freq-option .freq-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .freq-option .freq-icon { width: 14px; height: 14px; flex-shrink: 0; opacity: 0.5; }
+    .freq-option:hover .freq-icon { opacity: 0.8; }
+    .freq-custom-btn {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 11px;
+      color: #6366f1;
+      cursor: pointer;
+      transition: all 0.12s ease;
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      border: 1px dashed rgba(99,102,241,0.25);
+      margin-top: 2px;
+    }
+    .freq-custom-btn:hover { background: rgba(99,102,241,0.08); color: #818cf8; border-color: rgba(99,102,241,0.4); }
+
+    /* ── Custom Frequency Modal ── */
+    .freq-modal-backdrop {
+      position: fixed; inset: 0; z-index: 10000;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(8px);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; transition: opacity 0.2s ease;
+      pointer-events: none;
+    }
+    .freq-modal-backdrop.open { opacity: 1; pointer-events: auto; }
+    .freq-modal {
+      width: 340px; max-width: 92vw;
+      background: rgba(12,12,18,0.95);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+      transform: scale(0.95); transition: transform 0.2s ease;
+    }
+    .freq-modal-backdrop.open .freq-modal { transform: scale(1); }
+    .freq-modal label {
+      display: block; font-size: 11px; color: #94a3b8;
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      margin-bottom: 4px; font-weight: 500;
+    }
+    .freq-modal select, .freq-modal input {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.04);
+      color: #e2e8f0;
+      font-size: 12px;
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+    .freq-modal select:focus, .freq-modal input:focus { border-color: rgba(99,102,241,0.4); }
+    .freq-modal select option { background: #0c0c12; color: #e2e8f0; }
+    .freq-day-btn {
+      width: 32px; height: 32px; border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: transparent; color: #64748b;
+      font-size: 10px; font-weight: 600; cursor: pointer;
+      transition: all 0.12s ease;
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+    }
+    .freq-day-btn:hover { border-color: rgba(99,102,241,0.3); color: #94a3b8; }
+    .freq-day-btn.selected { background: rgba(99,102,241,0.15); border-color: rgba(99,102,241,0.4); color: #a5b4fc; }
+
+    /* ── Communication Heatmap ───────────────── */
+    .heatmap-cell {
+      width: 10px; height: 10px; border-radius: 2px;
+      transition: all 0.15s ease;
+    }
+    .heatmap-cell:hover { transform: scale(1.4); }
+
+    /* ── Email Inbox Cards ───────────────────── */
+    .email-card {
+      transition: all 0.15s ease;
+      cursor: pointer;
+    }
+    .email-card:hover { border-color: rgba(99,102,241,0.2); background: rgba(255,255,255,0.035); }
+    .email-unread { border-left: 2px solid #6366f1; }
+
+    /* ── Executive Typography ─────────────────── */
+    .font-display { font-family: 'Manrope', system-ui, sans-serif; }
+    .font-label   { font-family: 'Space Grotesk', system-ui, sans-serif; }
+  </style>
+</head>
+<body class="bg-obsidian text-slate-400 font-sans min-h-screen overflow-x-hidden">
+
+  <!-- ════════════════════════════════════════════
+       COMMAND BAR — Fixed, floating, glassmorphism
+       ════════════════════════════════════════════ -->
+  <div id="command-bar"
+       class="fixed top-5 left-1/2 -translate-x-1/2 z-50 w-[600px] max-w-[92vw]
+              glass bg-white/[0.04] border border-white/[0.08] rounded-2xl
+              flex items-center gap-3 px-5 py-3.5
+              transition-all duration-300">
+    <!-- Prefix Icon -->
+    <div class="flex-none text-slate-600 text-sm select-none font-medium tracking-tight">
+      <span class="text-indigo-500/70">&#9656;</span> nexus
+    </div>
+    <!-- Input -->
+    <input id="cmd-input" type="text"
+           placeholder="What needs to happen next?"
+           autocomplete="off" spellcheck="false"
+           class="flex-1 bg-transparent border-none outline-none text-slate-200 text-[15px]
+                  font-light placeholder:text-slate-600 caret-indigo-500 font-display" />
+    <!-- Voice Input -->
+    <button id="voice-btn" title="Voice input (Speech-to-Text)"
+            class="flex-none w-8 h-8 rounded-lg flex items-center justify-center
+                   text-slate-600 hover:text-indigo-400 hover:bg-white/[0.06]
+                   transition-all duration-200 cursor-pointer"
+            onclick="window._toggleVoice()">
+      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+      </svg>
+    </button>
+    <!-- Status -->
+    <div id="cmd-status" class="flex-none flex items-center gap-1.5">
+      <kbd class="text-[10px] text-slate-600 border border-white/[0.06] rounded px-1.5 py-0.5 font-mono">Enter</kbd>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+       URGENCY DNA — Quick-Tag HUD (below command bar)
+       ════════════════════════════════════════════ -->
+  <div id="urgency-hud"
+       class="fixed top-[76px] left-1/2 -translate-x-1/2 z-50 hidden">
+    <div class="flex items-center gap-2 px-3 py-2 rounded-xl glass bg-white/[0.03] border border-white/[0.06] shadow-lg">
+      <span class="text-[10px] text-slate-600 font-label tracking-wider mr-1">URGENCY</span>
+      <button class="urgency-chip flex items-center gap-1.5 px-3 py-1.5 rounded-lg
+                     bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-medium"
+              style="--chip-glow: rgba(34,197,94,0.3)"
+              data-urgency="async"
+              onclick="window._selectUrgency('async')">
+        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+        Async
+      </button>
+      <button class="urgency-chip flex items-center gap-1.5 px-3 py-1.5 rounded-lg
+                     bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[11px] font-medium selected"
+              style="--chip-glow: rgba(245,158,11,0.3)"
+              data-urgency="standard"
+              onclick="window._selectUrgency('standard')">
+        <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+        Standard
+      </button>
+      <button class="urgency-chip flex items-center gap-1.5 px-3 py-1.5 rounded-lg
+                     bg-red-500/10 border border-red-500/20 text-red-400 text-[11px] font-medium"
+              style="--chip-glow: rgba(239,68,68,0.3)"
+              data-urgency="critical"
+              onclick="window._selectUrgency('critical')">
+        <span class="w-2 h-2 rounded-full bg-red-400"></span>
+        Critical
+      </button>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+       MAIN LAYOUT
+       ════════════════════════════════════════════ -->
+  <main class="max-w-[1600px] mx-auto px-6 pt-[88px] pb-8">
+
+    <!-- ── HEADER ────────────────────────────── -->
+    <header class="flex items-center justify-between mb-6">
+      <!-- Logo -->
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20
+                    flex items-center justify-center">
+          <svg class="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-slate-200 text-lg font-semibold tracking-tight leading-none font-display">NEXUS</h1>
+          <p class="text-[11px] text-slate-600 font-light tracking-[0.2em] mt-0.5 font-label">EXECUTIVE OS</p>
+        </div>
+        <!-- WS Status -->
+        <div id="ws-badge" class="ml-4 flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/[0.03] border border-white/[0.06]">
+          <div id="ws-dot" class="w-1.5 h-1.5 rounded-full bg-slate-700 transition-colors duration-500"></div>
+          <span id="ws-label" class="text-[10px] text-slate-600 font-mono">OFFLINE</span>
+        </div>
+      </div>
+      <!-- Agent Status Pills -->
+      <div class="flex items-center gap-2">
+        <div class="agent-pill" data-agent="planning_agent">
+          <div class="agent-dot w-1.5 h-1.5 rounded-full bg-slate-700 transition-all duration-300"></div>
+          <span class="text-[11px] text-slate-500 font-light">Architect</span>
+        </div>
+        <div class="agent-pill" data-agent="learning_agent">
+          <div class="agent-dot w-1.5 h-1.5 rounded-full bg-slate-700 transition-all duration-300"></div>
+          <span class="text-[11px] text-slate-500 font-light">Coach</span>
+        </div>
+        <div class="agent-pill" data-agent="life_admin_agent">
+          <div class="agent-dot w-1.5 h-1.5 rounded-full bg-slate-700 transition-all duration-300"></div>
+          <span class="text-[11px] text-slate-500 font-light">Admin</span>
+        </div>
+        <div class="agent-pill" data-agent="proactive_monitor">
+          <div class="agent-dot w-1.5 h-1.5 rounded-full bg-slate-700 transition-all duration-300"></div>
+          <span class="text-[11px] text-slate-500 font-light">Watchdog</span>
+        </div>
+        <div class="w-px h-5 bg-white/[0.06] mx-1"></div>
+        <button id="settings-btn" onclick="window._openSettings()"
+                class="agent-pill cursor-pointer hover:border-indigo-500/30 hover:bg-indigo-500/[0.04] ring-1 ring-indigo-500/10"
+                title="Settings & Integrations">
+          <svg class="w-3.5 h-3.5 text-indigo-400/80" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          <span class="text-[11px] text-indigo-300/80 font-medium">Settings</span>
+        </button>
+      </div>
+    </header>
+
+    <style>
+      .agent-pill {
+        display: flex; align-items: center; gap: 6px;
+        padding: 4px 12px; border-radius: 9999px;
+        background: rgba(255,255,255,0.02);
+        border: 1px solid rgba(255,255,255,0.06);
+        transition: all 0.3s ease;
+      }
+      .agent-pill.agent-active {
+        background: rgba(99,102,241,0.06);
+        border-color: rgba(99,102,241,0.2);
+      }
+      .agent-pill.agent-active span { color: #a5b4fc; }
+    </style>
+
+    <!-- ── NARRATION HUB ─────────────────────── -->
+    <section id="narration-hub" class="mb-6 px-1">
+      <div id="narration-agent" class="text-[10px] text-slate-600 uppercase tracking-[0.2em] font-medium mb-2 h-4 transition-opacity duration-300 font-label"></div>
+      <div id="narration-text" class="text-slate-300 text-xl font-extralight leading-relaxed min-h-[2rem] tracking-tight font-display"></div>
+    </section>
+
+    <!-- ── BENTO GRID ────────────────────────── -->
+    <div class="grid grid-cols-12 gap-3" style="grid-auto-rows: minmax(0, 1fr);">
+
+      <!-- TILE A — Timeline -->
+      <div class="bento-tile col-span-5 bg-white/[0.02] border border-white/[0.07] rounded-2xl p-5 flex flex-col"
+           style="height: calc(100vh - 280px); min-height: 420px;">
+        <div class="flex items-center justify-between mb-2 flex-none">
+          <div class="flex items-center gap-2">
+            <div class="w-5 h-5 rounded-md bg-indigo-500/10 flex items-center justify-center">
+              <svg class="w-3 h-3 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+              </svg>
+            </div>
+            <h2 class="text-sm text-slate-300 font-medium tracking-tight font-display">Timeline</h2>
+          </div>
+          <div id="timeline-count" class="text-[10px] text-slate-600 font-mono"></div>
+        </div>
+        <!-- Quick-Jump Date Strip -->
+        <div id="date-strip" class="flex gap-1.5 mb-3 flex-none overflow-x-auto scroll-thin pb-1" style="scrollbar-width:none;-ms-overflow-style:none;"></div>
+        <div id="timeline-content" class="flex-1 overflow-y-auto scroll-thin space-y-1 pr-1">
+          <div class="flex items-center justify-center h-full text-slate-700 text-sm font-light">
+            Loading...
+          </div>
+        </div>
+      </div>
+
+      <!-- TILE B — Knowledge Hub -->
+      <div class="bento-tile col-span-4 bg-white/[0.02] border border-white/[0.07] rounded-2xl p-5 flex flex-col"
+           style="height: calc(100vh - 280px); min-height: 420px;">
+        <div class="flex items-center justify-between mb-2 flex-none">
+          <div class="flex items-center gap-2">
+            <div class="w-5 h-5 rounded-md bg-indigo-500/10 flex items-center justify-center">
+              <svg class="w-3 h-3 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+              </svg>
+            </div>
+            <h2 class="text-sm text-slate-300 font-medium tracking-tight font-display">Knowledge Hub</h2>
+          </div>
+          <div class="flex items-center gap-2">
+            <div id="vault-count" class="text-[10px] text-slate-600 font-mono"></div>
+            <!-- View toggle -->
+            <button id="kb-view-toggle" title="Toggle list/grid view"
+                    class="p-1 rounded-md hover:bg-white/[0.06] text-slate-600 hover:text-slate-400 transition-colors"
+                    onclick="window._toggleKbView()">
+              <svg id="kb-view-icon" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <!-- Search Bar -->
+        <div class="flex items-center gap-2 mb-3 flex-none">
+          <div class="flex-1 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06]">
+            <svg class="w-3 h-3 text-slate-600 flex-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+            </svg>
+            <input id="kb-search" type="text" placeholder="Search knowledge..."
+                   class="flex-1 bg-transparent border-none outline-none text-slate-300 text-[12px] font-light placeholder:text-slate-700"
+                   oninput="window._filterKb(this.value)" />
+          </div>
+        </div>
+        <div id="vault-content" class="flex-1 overflow-y-auto scroll-thin space-y-2 pr-1">
+          <div class="flex items-center justify-center h-full text-slate-700 text-sm font-light">
+            Loading...
+          </div>
+        </div>
+      </div>
+
+      <!-- TILE C — Live Reasoning -->
+      <div class="bento-tile col-span-3 bg-white/[0.02] border border-white/[0.07] rounded-2xl p-4 flex flex-col"
+           style="height: calc(100vh - 280px); min-height: 420px;">
+        <div class="flex items-center justify-between mb-3 flex-none">
+          <div class="flex items-center gap-2">
+            <div class="w-5 h-5 rounded-md bg-indigo-500/10 flex items-center justify-center">
+              <svg class="w-3 h-3 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+              </svg>
+            </div>
+            <h2 class="text-sm text-slate-300 font-medium tracking-tight font-display">Live Reasoning</h2>
+          </div>
+          <div class="flex items-center gap-2">
+            <div id="trace-count" class="text-[10px] text-slate-600 font-mono">0</div>
+            <button id="trace-expand-btn" onclick="window._toggleReasoning()"
+                    class="text-[10px] text-indigo-400/70 hover:text-indigo-400 font-medium transition-colors cursor-pointer">
+              View Thinking
+            </button>
+          </div>
+        </div>
+        <!-- Pulse Summary (default view) -->
+        <div id="trace-pulse" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-black/20 mb-2 flex-none">
+          <div class="w-2 h-2 rounded-full bg-indigo-500/50 reason-pulse flex-none"></div>
+          <span id="trace-pulse-text" class="text-[12px] text-slate-500 font-light">Waiting for activity...</span>
+        </div>
+        <!-- Deep Dive (hidden by default) -->
+        <div id="trace-content"
+             class="flex-1 overflow-y-auto scroll-thin text-[11px] leading-relaxed
+                    bg-black/20 rounded-xl p-3 space-y-1 hidden">
+        </div>
+      </div>
+    </div>
+
+    <!-- ── COGNITIVE INFRASTRUCTURE PULSE (below bento grid) ── -->
+    <div class="mt-3 p-4 bg-white/[0.02] border border-white/[0.07] rounded-2xl">
+      <div class="flex items-center justify-between mb-1">
+        <div class="flex items-center gap-2">
+          <div class="w-5 h-5 rounded-md bg-indigo-500/10 flex items-center justify-center">
+            <svg class="w-3 h-3 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+            </svg>
+          </div>
+          <h2 class="text-sm text-slate-300 font-medium tracking-tight font-display">Cognitive Infrastructure Pulse</h2>
+        </div>
+        <span id="heatmap-label" class="text-[10px] text-slate-600 font-label tracking-wider"></span>
+      </div>
+      <p class="text-[10px] text-slate-700 font-light mb-3 ml-7">Visualizing background operations: Email sorting, context-linking, and notification suppression.</p>
+      <div id="heatmap-grid" class="flex items-end gap-[3px] h-[40px]"></div>
+    </div>
+
+    <!-- ── FOOTER ────────────────────────────── -->
+    <footer class="mt-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="text-[10px] text-slate-700 font-label tracking-wider">NEXUS v2.0</span>
+        <span class="text-[10px] text-slate-800">|</span>
+        <span id="db-status" class="text-[10px] text-slate-700 font-mono"></span>
+      </div>
+      <div class="text-[10px] text-slate-800 font-light font-label tracking-wider">INVISIBLE EXECUTIVE INFRASTRUCTURE</div>
+    </footer>
+  </main>
+
+
+  <!-- ════════════════════════════════════════════
+       DOCUMENT VIEWER OVERLAY
+       ════════════════════════════════════════════ -->
+  <div id="doc-overlay" class="fixed inset-0 z-[60] hidden" role="dialog" aria-modal="true" aria-label="Document viewer">
+    <!-- Backdrop -->
+    <div id="doc-backdrop" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
+    <!-- Panel -->
+    <div id="doc-panel" class="absolute inset-4 sm:inset-8 md:inset-y-8 md:left-[12%] md:right-[12%] lg:left-[16%] lg:right-[16%]
+                bg-[#0a0a0a] border border-white/[0.08] rounded-2xl flex flex-col overflow-hidden shadow-2xl">
+      <!-- Header -->
+      <div class="flex items-center justify-between px-6 py-4 border-b border-white/[0.06] flex-none">
+        <div class="flex-1 min-w-0 mr-4">
+          <h2 id="doc-title" class="text-base text-slate-200 font-semibold truncate"></h2>
+          <div class="flex items-center gap-3 mt-1">
+            <span id="doc-date" class="text-[11px] text-slate-600 font-mono"></span>
+            <div id="doc-tags" class="flex items-center gap-1 flex-wrap"></div>
+          </div>
+        </div>
+        <!-- Actions Bar -->
+        <div class="flex items-center gap-1 flex-none">
+          <!-- Copy -->
+          <button id="doc-btn-copy" title="Copy to clipboard"
+                  class="p-2 rounded-lg hover:bg-white/[0.06] text-slate-500 hover:text-slate-300 transition-colors">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+            </svg>
+          </button>
+          <!-- Download .md -->
+          <button id="doc-btn-md" title="Download as Markdown"
+                  class="p-2 rounded-lg hover:bg-white/[0.06] text-slate-500 hover:text-slate-300 transition-colors">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+          </button>
+          <!-- Print / PDF -->
+          <button id="doc-btn-pdf" title="Export to PDF"
+                  class="p-2 rounded-lg hover:bg-white/[0.06] text-slate-500 hover:text-slate-300 transition-colors">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18.75 12h.008v.008h-.008V12zm-2.25 0h.008v.008H16.5V12z" />
+            </svg>
+          </button>
+          <!-- Divider -->
+          <div class="w-px h-5 bg-white/[0.06] mx-1"></div>
+          <!-- Close -->
+          <button id="doc-btn-close" title="Close (Esc)"
+                  class="p-2 rounded-lg hover:bg-white/[0.06] text-slate-500 hover:text-slate-300 transition-colors">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+      <!-- Body — Scrollable Rendered Document -->
+      <div id="doc-body" class="flex-1 overflow-y-auto scroll-thin px-8 py-6 doc-prose">
+      </div>
+      <!-- Footer -->
+      <div class="flex items-center justify-between px-6 py-3 border-t border-white/[0.06] flex-none">
+        <span id="doc-wordcount" class="text-[10px] text-slate-700 font-mono"></span>
+        <span class="text-[10px] text-slate-700 font-mono">NEXUS KNOWLEDGE HUB</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+       NEURAL LINK OVERLAY
+       ════════════════════════════════════════════ -->
+  <!-- ════════════════════════════════════════════
+       SETTINGS > INTEGRATIONS OVERLAY
+       ════════════════════════════════════════════ -->
+  <div id="settings-overlay" class="fixed inset-0 z-[60] hidden" role="dialog" aria-modal="true" aria-label="Settings">
+    <div id="settings-backdrop" class="absolute inset-0 bg-black/60 backdrop-blur-md"></div>
+    <div id="settings-panel" class="absolute inset-y-8 left-1/2 -translate-x-1/2 w-[620px] max-w-[92vw]
+                neural-link-glass border border-white/[0.08] rounded-2xl flex flex-col overflow-hidden shadow-2xl">
+      <!-- Header -->
+      <div class="flex items-center justify-between px-6 py-4 border-b border-white/[0.06] flex-none">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-slate-500/10 border border-slate-500/20 flex items-center justify-center">
+            <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </div>
+          <div>
+            <h2 class="text-base text-slate-200 font-semibold font-display">Settings</h2>
+            <p class="text-[11px] text-slate-600 font-light mt-0.5 font-label tracking-wider">INTEGRATIONS &amp; ACCOUNTS</p>
+          </div>
+        </div>
+        <button id="settings-close-btn" title="Close (Esc)"
+                class="p-2 rounded-lg hover:bg-white/[0.06] text-slate-500 hover:text-slate-300 transition-colors close-rotate">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <!-- Body -->
+      <div id="settings-body" class="flex-1 overflow-y-auto p-6 space-y-4">
+        <div class="text-center py-10 text-slate-600 text-sm font-light">Loading integrations...</div>
+      </div>
+      <!-- Footer -->
+      <div class="flex items-center justify-center px-6 py-3 border-t border-white/[0.06] flex-none">
+        <span class="text-[10px] text-slate-700 font-mono tracking-wider">NEXUS SETTINGS &middot; MULTI-TENANT INTEGRATIONS</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+       TOAST CONTAINER
+       ════════════════════════════════════════════ -->
+  <div id="toast-container" class="fixed bottom-6 right-6 z-[70] flex flex-col gap-2 items-end pointer-events-none"></div>
+
+  <!-- ════════════════════════════════════════════
+       JAVASCRIPT — The Brain
+       ════════════════════════════════════════════ -->
+  <script>
+  (function() {
+    'use strict';
+
+    // ── STATE ─────────────────────────────────
+    const state = {
+      ws: null,
+      wsPingInterval: null,
+      wsReconnectDelay: 1000,
+      agentTimers: {},
+      traceCount: 0,
+      narrationTimer: null,
+      isProcessing: false,
+      firstTrace: true,
+      reasoningExpanded: false,
+      kbListView: false,
+      lastPulseText: '',
+      highlightedTaskId: null,
+      // Urgency DNA
+      selectedUrgency: 'standard',
+      urgencyHudTimer: null,
+      urgencyHudVisible: false,
+    };
+
+    // ── CONSTANTS ─────────────────────────────
+    const AGENTS = {
+      primary_agent: 'NEXUS',
+      general_agent: 'NEXUS',
+      planning_agent: 'Schedule Architect',
+      learning_agent: 'Learning Coach',
+      life_admin_agent: 'Life Admin',
+      proactive_monitor: 'Watchdog',
+    };
+
+    const TRACE_COLORS = {
+      thought:      { accent: '#a78bfa', badge: 'THK',  bg: 'rgba(167,139,250,0.10)' },  // Violet
+      tool_call:    { accent: '#22d3ee', badge: 'CALL', bg: 'rgba(34,211,238,0.08)' },   // Cyan
+      tool_result:  { accent: '#10b981', badge: 'RES',  bg: 'rgba(16,185,129,0.08)' },   // Green
+      delegation:   { accent: '#6366f1', badge: 'DEL',  bg: 'rgba(99,102,241,0.08)' },   // Indigo
+      error:        { accent: '#ef4444', badge: 'ERR',  bg: 'rgba(239,68,68,0.10)' },    // Red
+      plan:         { accent: '#8b5cf6', badge: 'PLAN', bg: 'rgba(139,92,246,0.08)' },   // Purple
+      final_answer: { accent: '#22c55e', badge: 'ANS',  bg: 'rgba(34,197,94,0.10)' },    // Green
+      narration:    { accent: '#38bdf8', badge: 'NAR',  bg: 'rgba(56,189,248,0.06)' },   // Sky
+      search:       { accent: '#f59e0b', badge: 'SRCH', bg: 'rgba(245,158,11,0.08)' },   // Amber
+    };
+
+    const PRIORITY_COLORS = {
+      urgent: '#ef4444', high: '#f59e0b', medium: '#6366f1', low: '#475569',
+    };
+
+    const STATUS_LABELS = {
+      pending: 'Pending', scheduled: 'Scheduled', in_progress: 'In Progress',
+      completed: 'Done', cancelled: 'Cancelled',
+    };
+
+    const STATUS_COLORS = {
+      pending: '#f59e0b',      // amber
+      scheduled: '#6366f1',    // indigo
+      in_progress: '#3b82f6',  // blue
+      completed: '#10b981',    // green
+      cancelled: '#475569',    // gray
+    };
+
+    const URGENCY_CONFIG = {
+      async:    { label: 'Async',    color: '#22c55e', bg: 'rgba(34,197,94,0.1)',  dot: 'urgency-async',    desc: 'No reminders. Check at leisure.' },
+      standard: { label: 'Standard', color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', dot: 'urgency-standard', desc: 'Gentle nudge 2h before deadline.' },
+      critical: { label: 'Critical', color: '#ef4444', bg: 'rgba(239,68,68,0.1)',  dot: 'urgency-critical', desc: 'Escalating: T-4h, T-1h, T-15m.' },
+    };
+
+    // ── Frequency Picker — Categorized Options ──
+    const FREQ_SECTIONS = [
+      {
+        label: 'Quick Intervals',
+        icon: `<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`,
+        options: [
+          { value: '15m',  label: 'Every 15 min',  color: '#ef4444', sub: 'Aggressive' },
+          { value: '30m',  label: 'Every 30 min',  color: '#ef4444', sub: '' },
+          { value: '1h',   label: 'Every 1 hour',  color: '#f59e0b', sub: '' },
+          { value: '2h',   label: 'Every 2 hours', color: '#f59e0b', sub: '' },
+          { value: '4h',   label: 'Every 4 hours', color: '#6366f1', sub: '' },
+          { value: '8h',   label: 'Every 8 hours', color: '#6366f1', sub: '' },
+        ],
+      },
+      {
+        label: 'Recurring',
+        icon: `<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182M2.985 19.644l3.181-3.182"/></svg>`,
+        options: [
+          { value: 'daily',   label: 'Daily',   color: '#22c55e', sub: 'Every day at 9 AM' },
+          { value: 'weekdays', label: 'Weekdays', color: '#22c55e', sub: 'Mon–Fri' },
+          { value: 'weekly',  label: 'Weekly',  color: '#3b82f6', sub: 'Same day each week' },
+          { value: 'monthly', label: 'Monthly', color: '#8b5cf6', sub: 'Same date each month' },
+        ],
+      },
+      {
+        label: 'Controls',
+        icon: `<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>`,
+        options: [
+          { value: 'suppress', label: 'Suppress all', color: '#475569', sub: 'Mute reminders' },
+          { value: null,       label: 'Reset to default', color: '#64748b', sub: 'Use urgency-based' },
+        ],
+      },
+    ];
+    const REMINDER_LABELS = {
+      '15m': '15m', '30m': '30m', '1h': '1h', '2h': '2h', '4h': '4h', '8h': '8h',
+      'daily': 'Daily', 'weekdays': 'Wkdays', 'weekly': 'Weekly', 'monthly': 'Monthly',
+      'suppress': 'Muted',
+    };
+    // Flatten for quick lookup
+    const ALL_FREQ_OPTIONS = FREQ_SECTIONS.flatMap(s => s.options);
+
+    const MAX_TRACE_ENTRIES = 200;
+
+    // ── DOM REFS ──────────────────────────────
+    const $ = (sel) => document.querySelector(sel);
+    const cmdInput     = $('#cmd-input');
+    const cmdBar       = $('#command-bar');
+    const cmdStatus    = $('#cmd-status');
+    const narrAgent    = $('#narration-agent');
+    const narrText     = $('#narration-text');
+    const timelineEl   = $('#timeline-content');
+    const vaultEl      = $('#vault-content');
+    const traceEl      = $('#trace-content');
+    const traceCnt     = $('#trace-count');
+    const timelineCnt  = $('#timeline-count');
+    const vaultCnt     = $('#vault-count');
+    const wsDot        = $('#ws-dot');
+    const wsLabel      = $('#ws-label');
+    const dbStatus     = $('#db-status');
+
+
+    // ═══════════════════════════════════════════
+    // WEBSOCKET
+    // ═══════════════════════════════════════════
+
+    function connectWS() {
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      state.ws = new WebSocket(`${proto}//${location.host}/ws/mission-control`);
+
+      state.ws.onopen = () => {
+        state.wsReconnectDelay = 1000;
+        wsDot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-500 ws-connected transition-colors duration-500';
+        wsLabel.textContent = 'LIVE';
+        wsLabel.className = 'text-[10px] text-emerald-500/80 font-mono';
+
+        // Keepalive
+        clearInterval(state.wsPingInterval);
+        state.wsPingInterval = setInterval(() => {
+          if (state.ws && state.ws.readyState === WebSocket.OPEN) state.ws.send('ping');
+        }, 30000);
+      };
+
+      state.ws.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.type === 'pong') return;
+          handleWSMessage(data);
+        } catch(err) { /* ignore non-JSON */ }
+      };
+
+      state.ws.onclose = () => {
+        clearInterval(state.wsPingInterval);
+        wsDot.className = 'w-1.5 h-1.5 rounded-full bg-slate-700 transition-colors duration-500';
+        wsLabel.textContent = 'OFFLINE';
+        wsLabel.className = 'text-[10px] text-slate-600 font-mono';
+
+        setTimeout(connectWS, state.wsReconnectDelay);
+        state.wsReconnectDelay = Math.min(state.wsReconnectDelay * 2, 30000);
+      };
+
+      state.ws.onerror = () => { state.ws.close(); };
+    }
+
+    function handleWSMessage(data) {
+      // 1. Activate agent indicator
+      activateAgent(data.agent_name);
+
+      // 2. Append to Trace
+      addTraceEntry(data);
+
+      // 3. Update Narration if present
+      if (data.narration) {
+        updateNarration(data.narration, data.agent_name);
+      }
+
+      // 4. UI_REFRESH: Reactive sync on any data-mutating event
+      const mutationTypes = ['final_answer', 'tool_result'];
+      const mutationTools = ['create_task', 'update_task', 'complete_task', 'create_event', 'update_event', 'delete_event', 'create_note', 'update_note'];
+      const toolName = (data.content || {}).tool || '';
+      if (data.event_type === 'final_answer' || (data.event_type === 'tool_result' && mutationTools.some(t => toolName.includes(t)))) {
+        setTimeout(() => { fetchTimeline(); fetchNotes(); fetchHealth(); }, 300);
+      }
+    }
+
+
+    // ═══════════════════════════════════════════
+    // AGENT STATUS INDICATORS
+    // ═══════════════════════════════════════════
+
+    function activateAgent(agentName) {
+      const pill = document.querySelector(`[data-agent="${agentName}"]`);
+      if (!pill) return;
+
+      pill.classList.add('agent-active');
+      clearTimeout(state.agentTimers[agentName]);
+      state.agentTimers[agentName] = setTimeout(() => {
+        pill.classList.remove('agent-active');
+      }, 3500);
+    }
+
+
+    // ═══════════════════════════════════════════
+    // NARRATION HUB — Typewriter
+    // ═══════════════════════════════════════════
+
+    function updateNarration(text, agentName) {
+      // Cancel any in-progress typewriter
+      if (state.narrationTimer) {
+        clearInterval(state.narrationTimer);
+        state.narrationTimer = null;
+      }
+
+      const friendly = AGENTS[agentName] || agentName;
+      narrAgent.textContent = friendly;
+      narrAgent.classList.add('narration-enter');
+      setTimeout(() => narrAgent.classList.remove('narration-enter'), 300);
+
+      // Typewriter
+      narrText.textContent = '';
+      narrText.classList.add('narration-typing');
+      let i = 0;
+      const speed = Math.max(12, Math.min(35, 800 / text.length)); // adaptive speed
+      state.narrationTimer = setInterval(() => {
+        if (i < text.length) {
+          narrText.textContent += text[i];
+          i++;
+        } else {
+          clearInterval(state.narrationTimer);
+          state.narrationTimer = null;
+          narrText.classList.remove('narration-typing');
+        }
+      }, speed);
+    }
+
+
+    // ═══════════════════════════════════════════
+    // LIVE REASONING — Collapsible Thought Process
+    // ═══════════════════════════════════════════
+
+    const STEP_ICONS = {
+      thought:      '💭', tool_call:  '⚡', tool_result: '✅',
+      delegation:   '🔀', error:      '⚠️', plan:       '📋',
+      final_answer: '🎯', narration:  '📡', search:     '🔍',
+    };
+    const STEP_LABELS = {
+      thought:      'Thinking', tool_call:  'Executing', tool_result: 'Result',
+      delegation:   'Delegating', error:    'Issue', plan:        'Planning',
+      final_answer: 'Complete', narration:  'Update', search:      'Searching',
+    };
+
+    const tracePulse = $('#trace-pulse-text');
+
+    function addTraceEntry(data) {
+      // Clear placeholder on first entry
+      if (state.firstTrace) {
+        traceEl.innerHTML = '';
+        state.firstTrace = false;
+      }
+
+      const cfg = TRACE_COLORS[data.event_type] || TRACE_COLORS.thought;
+      const agent = AGENTS[data.agent_name] || data.agent_name || 'NEXUS';
+      const content = extractTraceContent(data);
+      const icon = STEP_ICONS[data.event_type] || '💭';
+      const label = STEP_LABELS[data.event_type] || data.event_type;
+
+      // Update pulse summary (always visible)
+      const pulseText = _humanizePulse(data, agent, content);
+      if (pulseText) {
+        tracePulse.textContent = pulseText;
+        state.lastPulseText = pulseText;
+      }
+
+      // Build the deep-dive entry (glassmorphism stepper style)
+      const entry = document.createElement('div');
+      entry.className = 'reasoning-step flex items-start gap-2.5 py-1.5 px-2 rounded-lg relative';
+
+      // Clean content for display: remove IDs/UUIDs and "null" from user view
+      const cleanContent = content
+        .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '')
+        .replace(/\bnull\b/gi, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+
+      entry.innerHTML = `
+        <span class="flex-none text-sm mt-px">${icon}</span>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] font-medium" style="color:${cfg.accent}">${label}</span>
+            <span class="text-[10px] text-slate-700">${agent}</span>
+          </div>
+          <div class="text-[11px] text-slate-400 mt-0.5 break-words" style="white-space:pre-wrap;word-break:break-word">${escapeHtml(cleanContent || label)}</div>
+        </div>
+      `;
+
+      traceEl.appendChild(entry);
+      state.traceCount++;
+      traceCnt.textContent = state.traceCount;
+
+      // Live-update today's bar in the Cognitive Pulse heatmap
+      if (state.traceCount % 3 === 0) renderHeatmap(); // Refresh every 3rd trace to avoid over-rendering
+
+      // Cap DOM entries
+      while (traceEl.children.length > MAX_TRACE_ENTRIES) {
+        traceEl.removeChild(traceEl.firstChild);
+      }
+
+      // Auto-scroll if expanded
+      if (state.reasoningExpanded) {
+        traceEl.scrollTop = traceEl.scrollHeight;
+      }
+    }
+
+    function _humanizePulse(data, agent, content) {
+      // Executive reasoning tone — confident, concise, decisive
+      // Guard: ensure agent is never undefined/null/empty
+      const safeAgent = agent || 'NEXUS';
+      switch (data.event_type) {
+        case 'thought':      return `Evaluating context and determining optimal approach...`;
+        case 'tool_call':    return `Executing: ${(data.content||{}).tool || 'operation'}...`;
+        case 'tool_result':  return `Data received. Synthesizing results...`;
+        case 'delegation':   return `Escalating to ${AGENTS[(data.content||{}).delegated_to] || 'specialist'} for domain expertise...`;
+        case 'plan':         return `Architecting ${(data.content||{}).plan?.length || 'multi'}-step execution plan...`;
+        case 'final_answer': return `Directive complete. Awaiting next instruction.`;
+        case 'narration':    return (data.content||{}).message || `Processing...`;
+        case 'error':        return `Anomaly detected. Engaging fallback protocol...`;
+        default:             return `${safeAgent} is processing...`;
+      }
+    }
+
+    // Toggle reasoning panel
+    window._toggleReasoning = function() {
+      state.reasoningExpanded = !state.reasoningExpanded;
+      const btn = $('#trace-expand-btn');
+      const pulse = $('#trace-pulse');
+      if (state.reasoningExpanded) {
+        traceEl.classList.remove('hidden');
+        pulse.classList.add('hidden');
+        btn.textContent = 'Hide Thinking';
+        traceEl.scrollTop = traceEl.scrollHeight;
+      } else {
+        traceEl.classList.add('hidden');
+        pulse.classList.remove('hidden');
+        btn.textContent = 'View Thinking';
+      }
+    };
+
+    function extractTraceContent(data) {
+      const c = data.content || {};
+      switch (data.event_type) {
+        case 'thought':      return c.thought || '';
+        case 'tool_call': {
+          const toolName = c.tool || '';
+          const isSearch = toolName.includes('web_search') || toolName.includes('linkedin');
+          if (isSearch) return `NEXUS: Researching live ${toolName.includes('linkedin') ? 'LinkedIn' : 'web'} data...`;
+          return `${toolName}(${JSON.stringify(c.arguments || {}).substring(0, 200)})`;
+        }
+        case 'tool_result':  return `${c.tool} → ${JSON.stringify(c.result || {}).substring(0, 200)}`;
+        case 'delegation':   return `→ ${AGENTS[c.delegated_to] || c.delegated_to}: ${c.task || ''}`;
+        case 'error':        return c.error || 'Unknown error';
+        case 'plan':         return `${(c.plan || []).length} steps planned`;
+        case 'final_answer': return c.answer || '';
+        case 'narration':    return c.message || '';
+        default:             return JSON.stringify(c).substring(0, 300);
+      }
+    }
+
+    function escapeHtml(str) {
+      const d = document.createElement('div');
+      d.textContent = str;
+      return d.innerHTML;
+    }
+
+
+    // ═══════════════════════════════════════════
+    // REST API
+    // ═══════════════════════════════════════════
+
+    async function fetchTimeline() {
+      try {
+        const [eventsRes, tasksRes] = await Promise.all([
+          fetch('/data/events'), fetch('/data/tasks')
+        ]);
+        const events = await eventsRes.json();
+        const tasks  = await tasksRes.json();
+        renderTimeline(events, tasks);
+      } catch(e) {
+        timelineEl.innerHTML = '<div class="text-slate-700 text-xs text-center py-8 font-light">Failed to load timeline</div>';
+      }
+    }
+
+    async function fetchNotes() {
+      try {
+        const res = await fetch('/data/notes');
+        const notes = await res.json();
+        renderNotes(notes);
+      } catch(e) {
+        vaultEl.innerHTML = '<div class="text-slate-700 text-xs text-center py-8 font-light">Failed to load notes</div>';
+      }
+    }
+
+    async function fetchHealth() {
+      try {
+        const res = await fetch('/health/db');
+        const data = await res.json();
+        const c = data.counts || {};
+        dbStatus.textContent = `${c.tasks || 0} tasks · ${c.events || 0} events · ${c.notes || 0} notes`;
+      } catch(e) {
+        dbStatus.textContent = 'DB offline';
+      }
+    }
+
+    // ═══════════════════════════════════════════
+    // SUMMARY SNAPSHOT — De-cluttered long responses
+    // ═══════════════════════════════════════════
+
+    state._fullReportContent = null;
+
+    function _buildSummarySnapshot(fullText) {
+      // Extract first meaningful paragraph or first 3 bullet points
+      const lines = fullText.split('\n').filter(l => l.trim());
+      const bullets = lines.filter(l => /^[-*•]\s/.test(l.trim()));
+      const headers = lines.filter(l => /^#{1,3}\s/.test(l.trim()));
+
+      let snapshot = '';
+
+      // Strategy 1: If there are headers + bullets, take first header + first 3 bullets
+      if (headers.length > 0 && bullets.length > 0) {
+        snapshot = headers[0].replace(/^#+\s*/, '').trim();
+        const topBullets = bullets.slice(0, 3).map(b => b.trim()).join(' · ');
+        snapshot += ' — ' + topBullets;
+      }
+      // Strategy 2: First 2 non-empty lines
+      else if (lines.length > 0) {
+        snapshot = lines.slice(0, 2).join(' ').replace(/[#*_`]/g, '').trim();
+      }
+
+      // Cap at ~200 chars
+      if (snapshot.length > 200) {
+        snapshot = snapshot.substring(0, 197) + '...';
+      }
+
+      return snapshot || fullText.substring(0, 200) + '...';
+    }
+
+    function _showFullReportButton(fullContent) {
+      state._fullReportContent = fullContent;
+      let btn = document.getElementById('full-report-btn');
+      if (!btn) {
+        btn = document.createElement('button');
+        btn.id = 'full-report-btn';
+        btn.className = 'mt-2 px-3 py-1.5 rounded-lg text-[11px] font-medium '
+          + 'bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 '
+          + 'hover:bg-indigo-500/20 hover:border-indigo-500/30 transition-all cursor-pointer';
+        btn.innerHTML = '📄 View Full Report';
+        btn.addEventListener('click', _openFullReportPanel);
+        // Insert after narration text
+        const narrContainer = narrText.parentElement || narrText.closest('.narration-box') || narrText.parentNode;
+        narrContainer.appendChild(btn);
+      }
+      btn.classList.remove('hidden');
+    }
+
+    function _hideFullReportButton() {
+      const btn = document.getElementById('full-report-btn');
+      if (btn) btn.classList.add('hidden');
+      state._fullReportContent = null;
+    }
+
+    function _openFullReportPanel() {
+      if (!state._fullReportContent) return;
+
+      // Re-use the existing document viewer overlay
+      const overlay = document.getElementById('doc-overlay');
+      docTitle.textContent = 'Full Report';
+      docDate.textContent = new Date().toLocaleString();
+      docTags.innerHTML = '<span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">AI Response</span>';
+      docBody.innerHTML = renderMarkdown(state._fullReportContent);
+      docWordCnt.textContent = state._fullReportContent.split(/\s+/).length + ' words';
+
+      // Store for copy/download actions
+      _activeNote = {
+        title: 'NEXUS Report',
+        content: state._fullReportContent,
+        tags: ['ai-response'],
+        created_at: new Date().toISOString(),
+      };
+
+      overlay.classList.remove('hidden');
+    }
+
+    async function sendChat(message) {
+      if (!message.trim() || state.isProcessing) return;
+      state.isProcessing = true;
+      cmdBar.classList.add('cmd-processing');
+      cmdStatus.innerHTML = '<div class="flex items-center gap-0.5"><div class="load-dot w-1 h-1 rounded-full bg-indigo-400"></div><div class="load-dot w-1 h-1 rounded-full bg-indigo-400"></div><div class="load-dot w-1 h-1 rounded-full bg-indigo-400"></div></div>';
+      cmdInput.value = '';
+      cmdInput.placeholder = 'Processing...';
+
+      // Hide urgency HUD on submit
+      _hideUrgencyHud();
+
+      // Append urgency hint if user selected non-default
+      let enrichedMessage = message;
+      if (state.selectedUrgency !== 'standard') {
+        enrichedMessage += ` [urgency: ${state.selectedUrgency}]`;
+      }
+      // Reset urgency for next input
+      state.selectedUrgency = 'standard';
+      _resetUrgencyChips();
+
+      try {
+        const res = await fetch('/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: enrichedMessage }),
+        });
+        const data = await res.json();
+
+        if (data.response) {
+          const SNAPSHOT_THRESHOLD = 500;
+          if (data.response.length > SNAPSHOT_THRESHOLD) {
+            // ── Summary Snapshot mode ──
+            const snapshot = _buildSummarySnapshot(data.response);
+            updateNarration(snapshot, 'primary_agent');
+            _showFullReportButton(data.response);
+          } else {
+            updateNarration(data.response, 'primary_agent');
+            _hideFullReportButton();
+          }
+        }
+
+        // Refresh tiles
+        await Promise.all([fetchTimeline(), fetchNotes(), fetchHealth()]);
+      } catch(e) {
+        updateNarration('Something went wrong. Please try again.', 'primary_agent');
+      } finally {
+        state.isProcessing = false;
+        cmdBar.classList.remove('cmd-processing');
+        cmdStatus.innerHTML = '<kbd class="text-[10px] text-slate-600 border border-white/[0.06] rounded px-1.5 py-0.5 font-mono">Enter</kbd>';
+        cmdInput.placeholder = 'What needs to happen next?';
+        cmdInput.focus();
+      }
+    }
+
+
+    // ═══════════════════════════════════════════
+    // RENDERERS
+    // ═══════════════════════════════════════════
+
+    function renderTimeline(events, tasks) {
+      // Merge into unified list
+      const items = [];
+
+      (events || []).forEach(e => {
+        items.push({
+          type: 'event',
+          sortDate: e.start_time || e.created_at || '',
+          title: e.title,
+          start: e.start_time,
+          end: e.end_time,
+          desc: e.description,
+          linked: e.linked_task_id,
+        });
+      });
+
+      (tasks || []).forEach(t => {
+        items.push({
+          type: 'task',
+          id: t.id,
+          sortDate: t.due_date || t.created_at || '',
+          title: t.title,
+          status: t.status,
+          priority: t.priority || 'medium',
+          urgency: t.urgency || 'standard',
+          reminder_interval: t.reminder_interval || null,
+          due: t.due_date,
+          est: t.estimated_minutes,
+          tags: t.tags || [],
+        });
+      });
+
+      items.sort((a, b) => a.sortDate.localeCompare(b.sortDate));
+
+      const total = items.length;
+      timelineCnt.textContent = total ? `${total} items` : '';
+
+      if (!total) {
+        document.getElementById('date-strip').innerHTML = '';
+        timelineEl.innerHTML = `
+          <div class="flex flex-col items-center justify-center h-full text-center">
+            <div class="text-slate-700 text-sm font-light">No events or tasks yet</div>
+            <div class="text-slate-800 text-xs mt-1 font-light">Try: "Plan my week" or "Create a task"</div>
+          </div>`;
+        return;
+      }
+
+      // ── Semantic Grouping ──
+      const today = new Date(); today.setHours(0,0,0,0);
+      const todayStr = today.toISOString().substring(0, 10);
+      const in7 = new Date(today); in7.setDate(in7.getDate() + 7);
+      const in7Str = in7.toISOString().substring(0, 10);
+
+      const semantic = { now: [], upcoming: [], archived: [] };
+      const dateGroups = {};
+
+      items.forEach(item => {
+        const dateKey = item.sortDate ? item.sortDate.substring(0, 10) : 'No date';
+        if (!dateGroups[dateKey]) dateGroups[dateKey] = [];
+        dateGroups[dateKey].push(item);
+
+        if (item.status === 'completed' || item.status === 'cancelled') {
+          semantic.archived.push(item);
+        } else if (dateKey <= todayStr) {
+          semantic.now.push(item);
+        } else if (dateKey <= in7Str) {
+          semantic.upcoming.push(item);
+        } else {
+          semantic.upcoming.push(item);
+        }
+      });
+
+      // ── Date Strip (Quick-Jump) ──
+      const uniqueDates = [...new Set(items.map(i => (i.sortDate || '').substring(0, 10)).filter(Boolean))].sort();
+      const strip = document.getElementById('date-strip');
+      strip.innerHTML = uniqueDates.slice(0, 14).map(d => {
+        const dt = new Date(d + 'T00:00:00');
+        const wd = dt.toLocaleDateString('en-US', { weekday: 'short' });
+        const day = dt.getDate();
+        const isToday = d === todayStr;
+        return `<button class="date-chip px-2.5 py-1 rounded-lg text-[10px] font-medium border border-white/[0.06] bg-white/[0.02] text-slate-600 ${isToday ? 'active' : ''}"
+                        onclick="window._jumpToDate('${d}')">${wd} ${day}</button>`;
+      }).join('');
+
+      // ── Render Semantic Sections ──
+      let html = '';
+
+      if (semantic.now.length) {
+        html += _renderAccordion('right-now', 'Right Now', semantic.now.length, true, semantic.now, dateGroups, todayStr);
+      }
+      if (semantic.upcoming.length) {
+        html += _renderAccordion('coming-up', 'Coming Up', semantic.upcoming.length, semantic.now.length === 0, semantic.upcoming, dateGroups);
+      }
+      if (semantic.archived.length) {
+        html += _renderAccordion('archived', 'Archived', semantic.archived.length, false, semantic.archived, dateGroups);
+      }
+
+      timelineEl.innerHTML = html;
+
+      // Highlight task if pending
+      if (state.highlightedTaskId) {
+        const el = document.getElementById('task-' + state.highlightedTaskId);
+        if (el) {
+          el.classList.add('task-highlighted');
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setTimeout(() => { el.classList.remove('task-highlighted'); state.highlightedTaskId = null; }, 2500);
+        }
+      }
+    }
+
+    function _renderAccordion(id, title, count, expanded, items, dateGroups, todayOverride) {
+      const chevron = expanded ? 'rotate-90' : '';
+      const bodyClass = expanded ? '' : 'collapsed';
+
+      // Group items by date within this section
+      const subGroups = {};
+      items.forEach(item => {
+        const dk = item.sortDate ? item.sortDate.substring(0, 10) : 'No date';
+        if (!subGroups[dk]) subGroups[dk] = [];
+        subGroups[dk].push(item);
+      });
+
+      let inner = '';
+      for (const [date, groupItems] of Object.entries(subGroups)) {
+        const label = formatDateLabel(date);
+        inner += `<div id="tl-date-${date}" class="text-[10px] text-slate-600 uppercase tracking-widest font-medium mt-2 mb-1 first:mt-0">${label}</div>`;
+        groupItems.forEach(item => {
+          inner += item.type === 'event' ? renderEventItem(item) : renderTaskItem(item);
+        });
+      }
+
+      return `
+        <div class="mb-1">
+          <div class="tl-group-toggle flex items-center gap-2 py-1.5 px-1" onclick="window._toggleTlGroup('${id}')">
+            <svg id="tl-chev-${id}" class="w-3 h-3 text-slate-600 transition-transform duration-200 ${chevron}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+            </svg>
+            <span class="text-[11px] text-slate-400 font-medium font-display">${title}</span>
+            <span class="text-[10px] text-slate-700 font-label">${count}</span>
+          </div>
+          <div id="tl-body-${id}" class="tl-group-body ${bodyClass}" style="${expanded ? '' : 'max-height:0'}">
+            ${inner}
+          </div>
+        </div>`;
+    }
+
+    window._toggleTlGroup = function(id) {
+      const body = document.getElementById('tl-body-' + id);
+      const chev = document.getElementById('tl-chev-' + id);
+      if (!body) return;
+      if (body.classList.contains('collapsed')) {
+        body.classList.remove('collapsed');
+        body.style.maxHeight = body.scrollHeight + 'px';
+        if (chev) chev.style.transform = 'rotate(90deg)';
+      } else {
+        body.classList.add('collapsed');
+        body.style.maxHeight = '0';
+        if (chev) chev.style.transform = '';
+      }
+    };
+
+    window._jumpToDate = function(dateKey) {
+      const el = document.getElementById('tl-date-' + dateKey);
+      if (!el) return;
+      // Expand parent accordion if collapsed
+      const parent = el.closest('.tl-group-body');
+      if (parent && parent.classList.contains('collapsed')) {
+        const id = parent.id.replace('tl-body-', '');
+        window._toggleTlGroup(id);
+        setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 350);
+      } else {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      // Highlight all chips
+      document.querySelectorAll('.date-chip').forEach(c => c.classList.remove('active'));
+      const chip = [...document.querySelectorAll('.date-chip')].find(c => c.onclick?.toString().includes(dateKey));
+    };
+
+    function renderEventItem(item) {
+      const timeStr = formatTimeRange(item.start, item.end);
+      return `
+        <div class="flex items-start gap-3 py-2 px-3 rounded-lg hover:bg-white/[0.02] transition-colors group">
+          <div class="w-0.5 h-full min-h-[28px] rounded-full bg-indigo-500/40 flex-none mt-0.5"></div>
+          <div class="flex-1 min-w-0">
+            <div class="text-[13px] text-slate-300 font-normal truncate">${escapeHtml(item.title)}</div>
+            <div class="text-[11px] text-slate-600 font-light mt-0.5">${timeStr}${item.linked ? ' · <span class="text-indigo-500/60">linked</span>' : ''}</div>
+          </div>
+          <div class="flex-none text-[10px] text-indigo-500/50 font-mono mt-0.5">EVENT</div>
+        </div>`;
+    }
+
+    function renderTaskItem(item) {
+      const prioColor = PRIORITY_COLORS[item.priority] || PRIORITY_COLORS.medium;
+      const statusColor = STATUS_COLORS[item.status] || STATUS_COLORS.pending;
+      const statusLabel = STATUS_LABELS[item.status] || item.status;
+      const isDone = item.status === 'completed';
+      const urgency = item.urgency || 'standard';
+      const urgCfg = URGENCY_CONFIG[urgency] || URGENCY_CONFIG.standard;
+      const ri = item.reminder_interval || null;
+      const riLabel = ri ? REMINDER_LABELS[ri] || ri : '';
+      const tags = (item.tags || []).slice(0, 3).map(t =>
+        `<span class="inline-block px-1.5 py-px rounded-full bg-indigo-500/10 text-indigo-400/70 text-[9px]">${escapeHtml(t)}</span>`
+      ).join('');
+
+      const checkIcon = isDone
+        ? `<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>`
+        : '';
+
+      // Urgency cycle: async → standard → critical → async
+      const urgencyNext = { async: 'standard', standard: 'critical', critical: 'async' };
+      const nextUrg = urgencyNext[urgency] || 'standard';
+
+      // Reminder indicator color
+      const riColor = ri ? (ALL_FREQ_OPTIONS.find(o => o.value === ri)?.color || '#6366f1') : null;
+
+      return `
+        <div id="task-${item.id}" class="flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-white/[0.02] transition-colors group ${isDone ? 'opacity-50' : ''}">
+          <!-- Urgency DNA Dot -->
+          <button onclick="event.stopPropagation(); window._cycleUrgency('${item.id}', '${nextUrg}')"
+                  class="urgency-dot ${urgCfg.dot} flex-none cursor-pointer"
+                  title="Urgency: ${urgCfg.label} — Click to change"></button>
+          <!-- Checkbox -->
+          <button onclick="window._completeTask('${item.id}')" ${isDone ? 'disabled' : ''}
+                  class="flex-none w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all
+                         ${isDone
+                           ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400 cursor-default'
+                           : 'border-white/[0.15] hover:border-indigo-400/60 hover:bg-indigo-500/10 text-transparent hover:text-indigo-400/40 cursor-pointer'}"
+                  style="${!isDone ? `border-color: ${prioColor}40` : ''}"
+                  title="${isDone ? 'Completed' : 'Mark complete'}">
+            ${checkIcon}
+          </button>
+          <!-- Content -->
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-1.5">
+              <span class="text-[13px] ${isDone ? 'text-slate-600 line-through' : 'text-slate-300'} font-normal truncate">${escapeHtml(item.title)}</span>
+              <!-- Timer icon — frequency override trigger (portal dropdown) -->
+              <button data-freq-trigger="${item.id}" data-freq-current="${ri || ''}"
+                      onclick="event.stopPropagation(); window._openFreqPicker('${item.id}', this)"
+                      class="task-actions-trash p-0.5 rounded transition-colors cursor-pointer flex-none
+                             ${ri ? 'text-indigo-400/70 hover:text-indigo-300' : 'text-slate-700 hover:text-indigo-400'}"
+                      title="Set reminder frequency${riLabel ? ` (${riLabel})` : ''}">
+                <svg class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </button>
+              ${riLabel ? `<span class="reminder-badge-live text-[9px] font-label px-1.5 py-px rounded-full" style="color:${riColor};background:${riColor}15">${riLabel}</span>` : ''}
+            </div>
+            <div class="flex items-center gap-2 mt-0.5 flex-wrap">
+              <span class="text-[10px] font-label font-medium px-1.5 py-px rounded-full" style="color:${statusColor};background:${statusColor}15">${statusLabel}</span>
+              <span class="text-[9px] font-label px-1.5 py-px rounded-full" style="color:${urgCfg.color};background:${urgCfg.bg}">${urgCfg.label}</span>
+              ${item.est ? `<span class="text-[10px] text-slate-600 font-label">${item.est}m</span>` : ''}
+              ${item.due ? `<span class="text-[10px] text-slate-600 font-label">${formatShortDate(item.due)}</span>` : ''}
+              ${tags}
+            </div>
+          </div>
+          <!-- Trash -->
+          <button onclick="window._deleteTask('${item.id}')"
+                  class="task-actions-trash flex-none p-1 -mr-1 rounded-md hover:bg-red-500/10 text-slate-700 hover:text-red-400 transition-colors cursor-pointer"
+                  title="Delete task" aria-label="Delete task">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+            </svg>
+          </button>
+        </div>`;
+    }
+
+    // ═══════════════════════════════════════════
+    // KNOWLEDGE HUB — Notes + Search + Categories
+    // ═══════════════════════════════════════════
+
+    // In-memory note cache for the viewer
+    let _notesCache = [];
+    let _kbFilter = '';
+
+    // Auto-categorization based on tags and content keywords
+    const CATEGORY_MAP = {
+      work:     { label: 'Work', color: '#6366f1', bg: 'rgba(99,102,241,0.12)', keywords: ['meeting', 'project', 'deadline', 'report', 'client', 'sprint', 'standup', 'review'] },
+      personal: { label: 'Personal', color: '#10b981', bg: 'rgba(16,185,129,0.12)', keywords: ['health', 'fitness', 'hobby', 'family', 'vacation', 'travel', 'recipe'] },
+      finance:  { label: 'Finance', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', keywords: ['budget', 'expense', 'invoice', 'payment', 'salary', 'tax', 'invest'] },
+      learning: { label: 'Learning', color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)', keywords: ['learn', 'study', 'course', 'tutorial', 'skill', 'certificate', 'curriculum'] },
+    };
+
+    function _autoCategory(note) {
+      const text = ((note.title || '') + ' ' + (note.content || '') + ' ' + ((note.tags || []).join(' '))).toLowerCase();
+      for (const [key, cat] of Object.entries(CATEGORY_MAP)) {
+        if (cat.keywords.some(kw => text.includes(kw))) return cat;
+      }
+      return null;
+    }
+
+    function renderNotes(notes) {
+      _notesCache = notes || [];
+      const count = _notesCache.length;
+      vaultCnt.textContent = count ? `${count} docs` : '';
+
+      _renderFilteredNotes();
+    }
+
+    function _renderFilteredNotes() {
+      const count = _notesCache.length;
+      if (!count) {
+        vaultEl.innerHTML = `
+          <div class="flex flex-col items-center justify-center h-full text-center">
+            <div class="text-slate-700 text-sm font-light">No documents yet</div>
+            <div class="text-slate-800 text-xs mt-1 font-light">Try: "I want to learn Kubernetes"</div>
+          </div>`;
+        return;
+      }
+
+      // Sort newest first
+      let filtered = [..._notesCache].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+
+      // Apply search filter
+      if (_kbFilter) {
+        const q = _kbFilter.toLowerCase();
+        filtered = filtered.filter(n =>
+          (n.title || '').toLowerCase().includes(q) ||
+          (n.content || '').toLowerCase().includes(q) ||
+          (n.tags || []).some(t => t.toLowerCase().includes(q))
+        );
+      }
+
+      if (!filtered.length) {
+        vaultEl.innerHTML = `<div class="text-center py-8 text-slate-700 text-xs font-light">No matching documents</div>`;
+        return;
+      }
+
+      let html = '';
+      filtered.forEach((note, _) => {
+        const realIdx = _notesCache.indexOf(note);
+        const preview = (note.content || '').substring(0, 200).replace(/\n/g, ' ');
+        const category = _autoCategory(note);
+        const tags = (note.tags || []).slice(0, 4).map(t =>
+          `<span class="inline-block px-1.5 py-px rounded-full bg-indigo-500/10 text-indigo-400/70 text-[9px]">${escapeHtml(t)}</span>`
+        ).join(' ');
+        const linked = (note.linked_task_ids || []).length;
+        const wordCount = (note.content || '').split(/\s+/).filter(Boolean).length;
+
+        const catBadge = category
+          ? `<span class="inline-block px-1.5 py-px rounded-full text-[9px] font-medium" style="color:${category.color};background:${category.bg}">${category.label}</span>`
+          : '';
+
+        html += `
+          <div class="note-card-clickable p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.05]
+                      hover:border-indigo-500/20 hover:bg-white/[0.035] transition-all group"
+               data-note-idx="${realIdx}" onclick="window._openDoc(${realIdx})">
+            <div class="flex items-start justify-between gap-2">
+              <h3 class="text-[13px] text-slate-300 font-medium truncate flex-1">${escapeHtml(note.title || 'Untitled')}</h3>
+              <div class="flex items-center gap-1 flex-none">
+                ${catBadge}
+                ${linked ? `<span class="text-[9px] text-slate-600 font-mono">${linked} linked</span>` : ''}
+                <button class="note-actions-trigger p-1 -mr-1 rounded-md hover:bg-white/[0.08] text-slate-600 hover:text-slate-400 transition-colors"
+                        onclick="event.stopPropagation(); window._openDoc(${realIdx})"
+                        title="Open document" aria-label="Open document">
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <p class="text-[12px] text-slate-600 font-light leading-relaxed mt-1.5 line-clamp-3">${escapeHtml(preview)}</p>
+            ${tags ? `<div class="flex items-center gap-1 mt-2 flex-wrap">${tags}</div>` : ''}
+            <div class="note-meta-footer flex items-center justify-between mt-2">
+              <span class="text-[10px] text-slate-700 font-light">${formatShortDate(note.created_at)}</span>
+              <span class="text-[10px] text-slate-700 font-mono">${wordCount} words</span>
+            </div>
+          </div>`;
+      });
+
+      vaultEl.innerHTML = html;
+    }
+
+    // Knowledge Hub search
+    window._filterKb = function(query) {
+      _kbFilter = (query || '').trim();
+      _renderFilteredNotes();
+    };
+
+    // Knowledge Hub view toggle
+    window._toggleKbView = function() {
+      state.kbListView = !state.kbListView;
+      const icon = $('#kb-view-icon');
+      if (state.kbListView) {
+        vaultEl.classList.add('kb-list-view');
+        icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />';
+      } else {
+        vaultEl.classList.remove('kb-list-view');
+        icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />';
+      }
+    };
+
+
+    // ═══════════════════════════════════════════
+    // DOCUMENT ENGINE — Viewer, Markdown, Actions
+    // ═══════════════════════════════════════════
+
+    const docOverlay  = $('#doc-overlay');
+    const docBackdrop = $('#doc-backdrop');
+    const docPanel    = $('#doc-panel');
+    const docTitle    = $('#doc-title');
+    const docDate     = $('#doc-date');
+    const docTags     = $('#doc-tags');
+    const docBody     = $('#doc-body');
+    const docWordCnt  = $('#doc-wordcount');
+    let _activeNote   = null;
+
+    // ── Lightweight Markdown → HTML renderer ──
+    function renderMarkdown(md) {
+      if (!md) return '<p class="text-slate-700 font-light italic">No content</p>';
+
+      let html = md
+        // Escape HTML entities first (then selectively un-escape our generated tags)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        // Code blocks (``` ... ```)
+        .replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) =>
+          `<pre><code class="language-${lang}">${code.trim()}</code></pre>`)
+        // Inline code
+        .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+        // Headers (### before ## before #)
+        .replace(/^#### (.+)$/gm, '<h4>$1</h4>')
+        .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+        .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+        .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+        // Bold & Italic
+        .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        // Horizontal rules
+        .replace(/^---+$/gm, '<hr>')
+        // Blockquotes
+        .replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>')
+        // Links
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+        // Tables (simple: header | row)
+        .replace(/^(\|.+\|)\n(\|[-| :]+\|)\n((?:\|.+\|\n?)*)/gm, (_, headerLine, sepLine, bodyLines) => {
+          const headers = headerLine.split('|').filter(c => c.trim()).map(c => `<th>${c.trim()}</th>`).join('');
+          const rows = bodyLines.trim().split('\n').map(row => {
+            const cells = row.split('|').filter(c => c.trim()).map(c => `<td>${c.trim()}</td>`).join('');
+            return `<tr>${cells}</tr>`;
+          }).join('');
+          return `<table><thead><tr>${headers}</tr></thead><tbody>${rows}</tbody></table>`;
+        });
+
+      // Process line-by-line for lists and paragraphs
+      const lines = html.split('\n');
+      let result = [];
+      let inUl = false, inOl = false;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const ulMatch = line.match(/^(\s*)[-*+] (.+)/);
+        const olMatch = line.match(/^(\s*)\d+\. (.+)/);
+
+        if (ulMatch) {
+          if (!inUl) { result.push('<ul>'); inUl = true; }
+          result.push(`<li>${ulMatch[2]}</li>`);
+        } else if (olMatch) {
+          if (!inOl) { result.push('<ol>'); inOl = true; }
+          result.push(`<li>${olMatch[2]}</li>`);
+        } else {
+          if (inUl) { result.push('</ul>'); inUl = false; }
+          if (inOl) { result.push('</ol>'); inOl = false; }
+
+          // Skip empty lines, pass through HTML tags
+          if (line.match(/^<(h[1-4]|pre|code|hr|blockquote|table|thead|tbody|tr|th|td|ul|ol|li|a)/)) {
+            result.push(line);
+          } else if (line.trim()) {
+            result.push(`<p>${line}</p>`);
+          }
+        }
+      }
+      if (inUl) result.push('</ul>');
+      if (inOl) result.push('</ol>');
+
+      // Merge consecutive blockquotes
+      return result.join('\n')
+        .replace(/<\/blockquote>\n<blockquote>/g, '<br>');
+    }
+
+    // ── Sanitize filename ──
+    function sanitizeFilename(title) {
+      if (!title || !title.trim()) return 'nexus-note';
+      return title
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '')
+        .substring(0, 80) || 'nexus-note';
+    }
+
+    // ── Toast notifications ──
+    function showToast(message, type = 'success') {
+      const container = $('#toast-container');
+      const colors = {
+        success: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400',
+        error: 'bg-red-500/10 border-red-500/20 text-red-400',
+        info: 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400',
+      };
+      const icons = {
+        success: '<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />',
+        error: '<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />',
+        info: '<path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />',
+      };
+
+      const toast = document.createElement('div');
+      toast.className = `toast-enter pointer-events-auto flex items-center gap-2 px-4 py-2.5
+                          rounded-xl border ${colors[type] || colors.info}
+                          text-[13px] font-light shadow-lg backdrop-blur-sm`;
+      toast.innerHTML = `
+        <svg class="w-4 h-4 flex-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          ${icons[type] || icons.info}
+        </svg>
+        <span>${escapeHtml(message)}</span>`;
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.classList.remove('toast-enter');
+        toast.classList.add('toast-exit');
+        toast.addEventListener('animationend', () => toast.remove());
+      }, 2500);
+    }
+
+    // ── Complete Task (Optimistic UI) ──
+    window._completeTask = async function(taskId) {
+      const el = document.getElementById('task-' + taskId);
+      if (!el) return;
+
+      // Optimistic: apply visual change immediately
+      const titleEl = el.querySelector('.text-\\[13px\\]');
+      const checkbox = el.querySelector('button');
+      if (titleEl) { titleEl.classList.add('line-through', 'text-slate-600'); titleEl.classList.remove('text-slate-300'); }
+      if (checkbox) {
+        checkbox.innerHTML = '<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+        checkbox.classList.add('bg-emerald-500/20', 'border-emerald-500/50', 'text-emerald-400');
+        checkbox.disabled = true;
+      }
+      el.style.opacity = '0.5';
+
+      try {
+        const res = await fetch(`/data/tasks/${taskId}/complete`, { method: 'POST' });
+        if (!res.ok) throw new Error('Failed');
+        showToast('Task completed', 'success');
+        setTimeout(fetchTimeline, 600);
+      } catch (e) {
+        showToast('Failed to complete task', 'error');
+        fetchTimeline(); // Restore real state
+      }
+    };
+
+    // ── Delete Task (Optimistic UI) ──
+    window._deleteTask = async function(taskId) {
+      const el = document.getElementById('task-' + taskId);
+      if (!el) return;
+
+      // Optimistic: fade-out animation
+      el.classList.add('task-removing');
+
+      try {
+        const res = await fetch(`/data/tasks/${taskId}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Failed');
+        showToast('Task removed', 'info');
+        // After animation completes, refresh
+        setTimeout(fetchTimeline, 400);
+      } catch (e) {
+        el.classList.remove('task-removing');
+        showToast('Failed to delete task', 'error');
+        fetchTimeline(); // Restore real state
+      }
+    };
+
+    // ── Open Document Viewer ──
+    window._openDoc = function(idx) {
+      const note = _notesCache[idx];
+      if (!note) return;
+      _activeNote = note;
+
+      // Populate
+      docTitle.textContent = note.title || 'Untitled Note';
+      docDate.textContent = note.created_at
+        ? new Date(note.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+        : '';
+      docTags.innerHTML = (note.tags || []).map(t =>
+        `<span class="inline-block px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400/70 text-[10px]">${escapeHtml(t)}</span>`
+      ).join('');
+
+      const content = note.content || '';
+      docBody.innerHTML = renderMarkdown(content);
+      const words = content.split(/\s+/).filter(Boolean).length;
+      const readMin = Math.max(1, Math.ceil(words / 200));
+      docWordCnt.textContent = `${words.toLocaleString()} words \u00b7 ${readMin} min read`;
+
+      // Show
+      docOverlay.classList.remove('hidden');
+      docBackdrop.className = 'absolute inset-0 bg-black/70 backdrop-blur-sm doc-overlay-enter';
+      docPanel.classList.add('doc-panel-enter');
+      docPanel.classList.remove('doc-panel-exit');
+      document.body.style.overflow = 'hidden';
+
+      // Scroll to top
+      docBody.scrollTop = 0;
+    };
+
+    // ── Close Document Viewer ──
+    function closeDoc() {
+      docBackdrop.classList.remove('doc-overlay-enter');
+      docBackdrop.classList.add('doc-overlay-exit');
+      docPanel.classList.remove('doc-panel-enter');
+      docPanel.classList.add('doc-panel-exit');
+      document.body.style.overflow = '';
+
+      setTimeout(() => {
+        docOverlay.classList.add('hidden');
+        _activeNote = null;
+      }, 250);
+    }
+
+    // ── Blob-to-File Engine: Download as Markdown ──
+    function downloadAsMarkdown() {
+      if (!_activeNote) return;
+      const title = _activeNote.title || 'Untitled Note';
+      const content = _activeNote.content || '';
+      const tags = (_activeNote.tags || []).join(', ');
+
+      // Build a clean .md file with frontmatter
+      const md = [
+        '---',
+        `title: "${title.replace(/"/g, '\\"')}"`,
+        `date: ${_activeNote.created_at || new Date().toISOString()}`,
+        tags ? `tags: [${tags}]` : null,
+        `source: NEXUS Vault`,
+        '---',
+        '',
+        `# ${title}`,
+        '',
+        content,
+      ].filter(line => line !== null).join('\n');
+
+      const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${sanitizeFilename(title)}.md`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('Downloaded as Markdown', 'success');
+    }
+
+    // ── Copy to Clipboard ──
+    async function copyToClipboard() {
+      if (!_activeNote) return;
+      const content = _activeNote.content || '';
+      if (!content.trim()) {
+        showToast('Nothing to copy', 'error');
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(content);
+        showToast('Copied to clipboard', 'success');
+      } catch {
+        // Fallback for older browsers / non-HTTPS
+        const ta = document.createElement('textarea');
+        ta.value = content;
+        ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast('Copied to clipboard', 'success');
+      }
+    }
+
+    // ── Export to PDF (via Print) ──
+    function exportToPdf() {
+      if (!_activeNote) return;
+      const title = _activeNote.title || 'Untitled Note';
+      const content = _activeNote.content || '';
+
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        showToast('Popup blocked — please allow popups', 'error');
+        return;
+      }
+      printWindow.document.write(`<!DOCTYPE html>
+<html><head>
+  <meta charset="UTF-8">
+  <title>${escapeHtml(title)}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; padding: 40px 50px; color: #1e293b; line-height: 1.7; max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 1.6em; font-weight: 600; margin-bottom: 0.3em; color: #0f172a; }
+    .meta { font-size: 0.8em; color: #64748b; margin-bottom: 1.5em; padding-bottom: 0.8em; border-bottom: 1px solid #e2e8f0; }
+    h2 { font-size: 1.3em; font-weight: 600; margin: 1.2em 0 0.4em; color: #1e293b; }
+    h3 { font-size: 1.1em; font-weight: 500; margin: 1em 0 0.3em; color: #334155; }
+    p { margin: 0.5em 0; }
+    ul, ol { padding-left: 1.5em; margin: 0.5em 0; }
+    li { margin: 0.2em 0; }
+    strong { font-weight: 600; }
+    code { font-family: monospace; font-size: 0.85em; background: #f1f5f9; padding: 0.1em 0.3em; border-radius: 3px; }
+    pre { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.8em; margin: 0.8em 0; overflow-x: auto; }
+    pre code { background: none; padding: 0; }
+    blockquote { border-left: 3px solid #6366f1; padding-left: 1em; margin: 0.8em 0; color: #475569; font-style: italic; }
+    hr { border: none; border-top: 1px solid #e2e8f0; margin: 1.5em 0; }
+    table { width: 100%; border-collapse: collapse; margin: 0.8em 0; font-size: 0.9em; }
+    th { text-align: left; padding: 0.5em; border-bottom: 2px solid #e2e8f0; font-weight: 500; }
+    td { padding: 0.4em 0.5em; border-bottom: 1px solid #f1f5f9; }
+    .footer { margin-top: 2em; padding-top: 0.8em; border-top: 1px solid #e2e8f0; font-size: 0.75em; color: #94a3b8; text-align: center; }
+    @media print { body { padding: 20px 30px; } .footer { position: fixed; bottom: 20px; left: 0; right: 0; } }
+  </style>
+</head><body>
+  <h1>${escapeHtml(title)}</h1>
+  <div class="meta">Generated by NEXUS \u00b7 ${_activeNote.created_at ? new Date(_activeNote.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : ''}</div>
+  ${renderMarkdown(content).replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')}
+  <div class="footer">Exported from NEXUS Vault</div>
+</body></html>`);
+      printWindow.document.close();
+      // Give fonts time to load
+      setTimeout(() => {
+        printWindow.print();
+      }, 600);
+      showToast('PDF export opened', 'info');
+    }
+
+    // ── Wire up actions ──
+    $('#doc-btn-close').addEventListener('click', closeDoc);
+    $('#doc-backdrop').addEventListener('click', closeDoc);
+    $('#doc-btn-copy').addEventListener('click', copyToClipboard);
+    $('#doc-btn-md').addEventListener('click', downloadAsMarkdown);
+    $('#doc-btn-pdf').addEventListener('click', exportToPdf);
+
+
+    // ═══════════════════════════════════════════
+    // UNIFIED SETTINGS — Integrations + Intelligence Tools
+    // ═══════════════════════════════════════════
+
+    let _settingsOpen = false;
+
+    function _renderSettingsCard(cfg) {
+      const isConnected = cfg.connected === true;
+      const isEnabled = cfg.enabled === true;
+
+      let statusBadge;
+      if (isConnected) {
+        statusBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-medium"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>Connected</span>';
+      } else if (isEnabled) {
+        statusBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 text-[10px] font-medium"><span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>Needs Auth</span>';
+      } else if (cfg.configRequired) {
+        statusBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 text-[10px] font-medium"><span class="w-1.5 h-1.5 rounded-full bg-red-400"></span>Not Configured</span>';
+      } else {
+        statusBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.05] text-slate-500 text-[10px] font-medium"><span class="w-1.5 h-1.5 rounded-full bg-slate-600"></span>Disconnected</span>';
+      }
+
+      let actionBtn = '';
+      if (cfg.actionable) {
+        if (isConnected) {
+          actionBtn = `<button onclick="window._disconnectProvider('${cfg.provider}')"
+            class="px-3 py-1.5 rounded-lg text-[11px] font-medium bg-red-500/10 border border-red-500/20 text-red-400
+                   hover:bg-red-500/20 hover:border-red-500/30 transition-all cursor-pointer">
+            Disconnect</button>`;
+        } else if (cfg.authUrl) {
+          actionBtn = `<a href="${cfg.authUrl}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg
+                          bg-indigo-500/15 border border-indigo-500/25
+                          text-indigo-300 text-[11px] font-semibold
+                          hover:bg-indigo-500/25 hover:border-indigo-400/40 hover:text-indigo-200
+                          transition-all duration-200 cursor-pointer"
+                       onclick="event.preventDefault(); window._connectProvider('${cfg.provider}');">
+            Connect</a>`;
+        } else {
+          actionBtn = `<button onclick="window._connectProvider('${cfg.provider}')"
+            class="px-3 py-1.5 rounded-lg text-[11px] font-medium bg-indigo-500/10 border border-indigo-500/20 text-indigo-400
+                   hover:bg-indigo-500/20 hover:border-indigo-500/30 transition-all cursor-pointer">
+            Connect</button>`;
+        }
+      } else {
+        // Read-only tool status (server-side config)
+        actionBtn = isConnected
+          ? `<span class="text-[10px] text-emerald-400/60 font-mono tracking-wider">ACTIVE</span>`
+          : `<span class="text-[10px] text-slate-600 font-mono tracking-wider">SET IN .env</span>`;
+      }
+
+      const borderClass = isConnected ? 'border-emerald-500/15 hover:border-emerald-500/30' : 'border-white/[0.06] hover:border-white/[0.1]';
+      const bgClass = isConnected ? 'bg-emerald-500/[0.02]' : 'bg-white/[0.025]';
+
+      return `
+        <div class="p-4 rounded-xl ${bgClass} border ${borderClass} hover:bg-white/[0.04] transition-all">
+          <div class="flex items-start justify-between mb-2">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-lg ${isConnected ? 'bg-emerald-500/10 border-emerald-500/20' : isEnabled ? 'bg-amber-500/10 border-amber-500/20' : 'bg-white/[0.04] border-white/[0.06]'} border flex items-center justify-center">
+                ${cfg.icon}
+              </div>
+              <div>
+                <h3 class="text-[13px] text-slate-300 font-medium">${cfg.name}</h3>
+                ${statusBadge}
+              </div>
+            </div>
+            <div class="flex-shrink-0 ml-2">${actionBtn}</div>
+          </div>
+          <p class="text-[12px] text-slate-600 font-light leading-relaxed">${cfg.description}</p>
+        </div>`;
+    }
+
+    window._openSettings = async function() {
+      const overlay = $('#settings-overlay');
+      const backdrop = $('#settings-backdrop');
+      const panel = $('#settings-panel');
+      const body = $('#settings-body');
+
+      overlay.classList.remove('hidden');
+      backdrop.className = 'absolute inset-0 bg-black/60 backdrop-blur-md doc-overlay-enter';
+      panel.classList.add('doc-panel-enter');
+      panel.classList.remove('doc-panel-exit');
+      document.body.style.overflow = 'hidden';
+      _settingsOpen = true;
+
+      body.innerHTML = '<div class="text-center py-10 text-slate-600 text-sm font-light">Loading integrations...</div>';
+
+      // Fetch MCP + tools status
+      let outlookEnabled = false, slackEnabled = false;
+      let webSearchEnabled = false, linkedinEnabled = false;
+      try {
+        const res = await fetch('/mcp/status');
+        if (res.ok) {
+          const data = await res.json();
+          outlookEnabled = data.outlook?.enabled === true;
+          slackEnabled = data.slack?.enabled === true;
+          webSearchEnabled = data.tools?.web_search?.enabled === true;
+          linkedinEnabled = data.tools?.linkedin?.enabled === true;
+        }
+      } catch (e) { /* MCP not loaded */ }
+
+      // Fetch live auth status
+      let outlookConnected = false, slackConnected = false;
+      try {
+        const authRes = await fetch('/auth/status');
+        if (authRes.ok) {
+          const authData = await authRes.json();
+          outlookConnected = authData.outlook?.connected === true;
+          slackConnected = authData.slack?.connected === true;
+        }
+      } catch (e) { /* offline */ }
+
+      // Enterprise Integrations — actionable connect/disconnect
+      const integrationCards = [
+        {
+          provider: 'outlook',
+          name: 'Microsoft Outlook',
+          icon: '<svg class="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" /></svg>',
+          description: 'Email triage, calendar sync, and invite conflict detection via Microsoft Graph API.',
+          enabled: outlookEnabled,
+          connected: outlookConnected,
+          configRequired: !outlookEnabled,
+          authUrl: '/auth/microsoft/login',
+          actionable: true,
+        },
+        {
+          provider: 'slack',
+          name: 'Slack',
+          icon: '<svg class="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" /></svg>',
+          description: 'Notifications, interactive approvals, and conflict resolution via Slack Block Kit.',
+          enabled: slackEnabled,
+          connected: slackConnected,
+          configRequired: !slackEnabled,
+          authUrl: '/auth/slack/install',
+          actionable: true,
+        },
+      ];
+
+      // Intelligence Tools — read-only status (server-side API keys)
+      const toolCards = [
+        {
+          provider: 'web_search',
+          name: 'Web Search (Tavily)',
+          icon: '<svg class="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418" /></svg>',
+          description: 'Real-time web intelligence. Enables current events, stock data, and live research. Rate limited: 10 searches/hour.',
+          enabled: webSearchEnabled,
+          connected: webSearchEnabled,
+          configRequired: !webSearchEnabled,
+          actionable: false,
+        },
+        {
+          provider: 'linkedin',
+          name: 'LinkedIn Networking',
+          icon: '<svg class="w-5 h-5 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>',
+          description: 'Profile search, synthesis, and personalized outreach drafting. Uses Tavily-powered web search.',
+          enabled: linkedinEnabled,
+          connected: linkedinEnabled,
+          configRequired: !linkedinEnabled,
+          actionable: false,
+        },
+      ];
+
+      body.innerHTML = `
+        <div id="settings-email-section"></div>
+        <div class="mb-5">
+          <h3 class="text-[11px] text-slate-500 uppercase tracking-widest font-label font-medium mb-3">Enterprise Integrations</h3>
+          <div class="grid grid-cols-1 gap-3">${integrationCards.map(_renderSettingsCard).join('')}</div>
+        </div>
+        <div class="mb-5">
+          <h3 class="text-[11px] text-slate-500 uppercase tracking-widest font-label font-medium mb-3">Intelligence Tools</h3>
+          <div class="grid grid-cols-1 gap-3">${toolCards.map(_renderSettingsCard).join('')}</div>
+        </div>
+        <div class="p-3 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+          <p class="text-[10px] text-slate-700 font-light leading-relaxed">
+            All OAuth tokens are encrypted with AES-256-GCM before storage.
+            Intelligence tools use a shared server key — no per-user configuration needed.
+            Disconnecting an account permanently wipes all stored credentials.
+          </p>
+        </div>`;
+
+      // Render email inbox section at top if Outlook connected
+      const emailSection = document.getElementById('settings-email-section');
+      if (emailSection && outlookConnected) {
+        await _renderEmailInbox(emailSection);
+      }
+    };
+
+    // Backward-compat aliases
+    window._openNeuralLink = window._openSettings;
+    window._openIntegrations = window._openSettings;
+
+    window._connectProvider = async function(provider) {
+      try {
+        const res = await fetch(`/auth/${provider}/connect`);
+        const data = await res.json();
+        if (data.auth_url) {
+          window.open(data.auth_url, '_blank', 'width=600,height=700');
+        } else if (data.message) {
+          showToast(data.message, data.status === 'disabled' ? 'error' : 'success');
+        }
+      } catch (e) {
+        showToast('Failed to initiate connection.', 'error');
+      }
+    };
+
+    window._disconnectProvider = async function(provider) {
+      const providerNames = { outlook: 'Microsoft Outlook', slack: 'Slack' };
+      if (!confirm(`Disconnect ${providerNames[provider] || provider}? This will wipe all stored tokens.`)) return;
+      try {
+        const res = await fetch(`/auth/${provider}/disconnect`, { method: 'DELETE' });
+        const data = await res.json();
+        showToast(data.message || 'Disconnected.', data.status === 'disconnected' ? 'success' : 'error');
+        window._openSettings();
+      } catch (e) {
+        showToast('Failed to disconnect.', 'error');
+      }
+    };
+
+    function closeSettings() {
+      const overlay = $('#settings-overlay');
+      const backdrop = $('#settings-backdrop');
+      const panel = $('#settings-panel');
+
+      backdrop.classList.remove('doc-overlay-enter');
+      backdrop.classList.add('doc-overlay-exit');
+      panel.classList.remove('doc-panel-enter');
+      panel.classList.add('doc-panel-exit');
+      document.body.style.overflow = '';
+      setTimeout(() => {
+        overlay.classList.add('hidden');
+        _settingsOpen = false;
+      }, 250);
+    }
+    window.closeNeuralLink = closeSettings;
+    window.closeIntegrations = closeSettings;
+
+    document.getElementById('settings-close-btn').addEventListener('click', closeSettings);
+    document.getElementById('settings-backdrop').addEventListener('click', closeSettings);
+
+
+    // ═══════════════════════════════════════════
+    // VOICE INPUT — Web Speech API
+    // ═══════════════════════════════════════════
+
+    let _voiceRecognition = null;
+    let _voiceActive = false;
+    let _voiceSilenceTimer = null;
+
+    function _initVoice() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        logger_warn('Speech Recognition not supported in this browser');
+        return null;
+      }
+
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+      recognition.maxAlternatives = 1;
+
+      recognition.onresult = (event) => {
+        let transcript = '';
+        let isFinal = false;
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+          if (event.results[i].isFinal) isFinal = true;
+        }
+
+        // Fill the input bar in real-time
+        cmdInput.value = transcript;
+
+        // Reset silence timer on each result
+        clearTimeout(_voiceSilenceTimer);
+        if (isFinal) {
+          // Auto-submit after 1.5s of silence following final result
+          _voiceSilenceTimer = setTimeout(() => {
+            _stopVoice();
+            if (cmdInput.value.trim()) {
+              sendChat(cmdInput.value);
+            }
+          }, 1500);
+        }
+      };
+
+      recognition.onend = () => {
+        // If we're still supposed to be active, restart (browser may stop early)
+        if (_voiceActive) {
+          try { recognition.start(); } catch(e) { _stopVoice(); }
+        }
+      };
+
+      recognition.onerror = (event) => {
+        if (event.error !== 'no-speech' && event.error !== 'aborted') {
+          showToast('Voice input error: ' + event.error, 'error');
+        }
+        _stopVoice();
+      };
+
+      return recognition;
+    }
+
+    function _startVoice() {
+      if (!_voiceRecognition) {
+        _voiceRecognition = _initVoice();
+      }
+      if (!_voiceRecognition) {
+        showToast('Voice input not supported in this browser', 'error');
+        return;
+      }
+
+      try {
+        _voiceRecognition.start();
+        _voiceActive = true;
+        const btn = $('#voice-btn');
+        btn.classList.add('voice-active');
+        cmdInput.placeholder = 'Listening...';
+        cmdInput.focus();
+      } catch(e) {
+        showToast('Could not start voice input', 'error');
+      }
+    }
+
+    function _stopVoice() {
+      _voiceActive = false;
+      clearTimeout(_voiceSilenceTimer);
+      if (_voiceRecognition) {
+        try { _voiceRecognition.stop(); } catch(e) { /* ignore */ }
+      }
+      const btn = $('#voice-btn');
+      if (btn) {
+        btn.classList.remove('voice-active');
+      }
+      cmdInput.placeholder = 'What needs to happen next?';
+    }
+
+    window._toggleVoice = function() {
+      if (_voiceActive) {
+        _stopVoice();
+      } else {
+        _startVoice();
+      }
+    };
+
+    // Helper (no-op if console not available)
+    function logger_warn(msg) { if (window.console) console.warn('[NEXUS]', msg); }
+
+
+    // ═══════════════════════════════════════════
+    // URGENCY DNA — Quick-Tag HUD
+    // ═══════════════════════════════════════════
+
+    const urgencyHud = document.getElementById('urgency-hud');
+
+    function _showUrgencyHud() {
+      if (state.urgencyHudVisible) return;
+      state.urgencyHudVisible = true;
+      urgencyHud.classList.remove('hidden');
+      urgencyHud.querySelector('div').classList.remove('urgency-hud-exit');
+      urgencyHud.querySelector('div').classList.add('urgency-hud-enter');
+      // Auto-hide after 5 seconds of no interaction
+      clearTimeout(state.urgencyHudTimer);
+      state.urgencyHudTimer = setTimeout(_hideUrgencyHud, 5000);
+    }
+
+    function _hideUrgencyHud() {
+      if (!state.urgencyHudVisible) return;
+      clearTimeout(state.urgencyHudTimer);
+      const inner = urgencyHud.querySelector('div');
+      inner.classList.remove('urgency-hud-enter');
+      inner.classList.add('urgency-hud-exit');
+      setTimeout(() => {
+        urgencyHud.classList.add('hidden');
+        state.urgencyHudVisible = false;
+      }, 150);
+    }
+
+    function _resetUrgencyChips() {
+      urgencyHud.querySelectorAll('.urgency-chip').forEach(chip => {
+        chip.classList.remove('selected');
+        if (chip.dataset.urgency === 'standard') chip.classList.add('selected');
+      });
+    }
+
+    window._selectUrgency = function(level) {
+      state.selectedUrgency = level;
+      urgencyHud.querySelectorAll('.urgency-chip').forEach(chip => {
+        chip.classList.toggle('selected', chip.dataset.urgency === level);
+      });
+      // Reset auto-hide timer
+      clearTimeout(state.urgencyHudTimer);
+      state.urgencyHudTimer = setTimeout(_hideUrgencyHud, 5000);
+      // Show toast feedback
+      const cfg = URGENCY_CONFIG[level];
+      showToast(`Urgency: ${cfg.label} — ${cfg.desc}`, 'info');
+    };
+
+    // Cycle urgency on existing task (click the dot on the task card)
+    window._cycleUrgency = async function(taskId, newUrgency) {
+      try {
+        const res = await fetch(`/data/tasks/${taskId}/urgency`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ urgency: newUrgency }),
+        });
+        if (!res.ok) throw new Error('Failed');
+        const cfg = URGENCY_CONFIG[newUrgency];
+        showToast(`Urgency → ${cfg.label}`, 'info');
+        setTimeout(fetchTimeline, 300);
+      } catch (e) {
+        showToast('Failed to update urgency', 'error');
+      }
+    };
+
+
+    // ═══════════════════════════════════════════
+    // FREQUENCY PICKER — Portal Pattern
+    // ═══════════════════════════════════════════
+
+    let _freqPortal = null;       // The portal DOM element
+    let _freqActiveTaskId = null; // Currently open task ID
+    let _freqCustomModal = null;  // Custom frequency modal
+
+    function _ensureFreqPortal() {
+      if (_freqPortal) return _freqPortal;
+      _freqPortal = document.createElement('div');
+      _freqPortal.className = 'freq-portal';
+      _freqPortal.id = 'freq-portal';
+      document.body.appendChild(_freqPortal);
+      return _freqPortal;
+    }
+
+    function _ensureFreqCustomModal() {
+      if (_freqCustomModal) return _freqCustomModal;
+      _freqCustomModal = document.createElement('div');
+      _freqCustomModal.className = 'freq-modal-backdrop';
+      _freqCustomModal.id = 'freq-custom-modal';
+      _freqCustomModal.innerHTML = `
+        <div class="freq-modal">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-[14px] text-slate-200 font-semibold font-display">Custom Reminder</h3>
+            <button onclick="window._closeFreqCustomModal()" class="p-1 rounded-lg hover:bg-white/[0.06] text-slate-500 hover:text-slate-300 transition-colors">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <!-- Mode selector -->
+          <div class="mb-4">
+            <label>Reminder Type</label>
+            <select id="freq-custom-mode" onchange="window._onFreqModeChange()">
+              <option value="interval">Repeat every X time</option>
+              <option value="days">Specific days of the week</option>
+              <option value="datetime">One-time alert</option>
+              <option value="cron">Cron expression (advanced)</option>
+            </select>
+          </div>
+          <!-- Dynamic fields container -->
+          <div id="freq-custom-fields" class="mb-4"></div>
+          <!-- Actions -->
+          <div class="flex items-center justify-end gap-2 mt-4">
+            <button onclick="window._closeFreqCustomModal()"
+                    class="px-3 py-1.5 rounded-lg text-[11px] text-slate-500 hover:text-slate-300 hover:bg-white/[0.04] transition-colors font-label">
+              Cancel
+            </button>
+            <button onclick="window._saveFreqCustom()"
+                    class="px-4 py-1.5 rounded-lg text-[11px] bg-indigo-500/15 border border-indigo-500/25 text-indigo-300 font-semibold hover:bg-indigo-500/25 transition-all font-label">
+              Save Reminder
+            </button>
+          </div>
+        </div>`;
+      document.body.appendChild(_freqCustomModal);
+      return _freqCustomModal;
+    }
+
+    // Render the mode-specific fields inside the custom modal
+    window._onFreqModeChange = function() {
+      const mode = document.getElementById('freq-custom-mode').value;
+      const container = document.getElementById('freq-custom-fields');
+      if (!container) return;
+
+      if (mode === 'interval') {
+        container.innerHTML = `
+          <div class="flex gap-2">
+            <div class="flex-1">
+              <label>Every</label>
+              <input type="number" id="freq-int-val" min="1" max="999" value="1" />
+            </div>
+            <div class="flex-1">
+              <label>Unit</label>
+              <select id="freq-int-unit">
+                <option value="m">Minutes</option>
+                <option value="h" selected>Hours</option>
+                <option value="d">Days</option>
+              </select>
+            </div>
+          </div>`;
+      } else if (mode === 'days') {
+        const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+        container.innerHTML = `
+          <label>Select Days</label>
+          <div class="flex gap-1.5 mt-1 mb-3">
+            ${days.map((d, i) => `<button type="button" class="freq-day-btn" data-day="${i}" onclick="this.classList.toggle('selected')">${d}</button>`).join('')}
+          </div>
+          <label>At Time</label>
+          <input type="time" id="freq-day-time" value="09:00" />`;
+      } else if (mode === 'datetime') {
+        container.innerHTML = `
+          <label>Date & Time</label>
+          <input type="datetime-local" id="freq-dt-value" />`;
+      } else if (mode === 'cron') {
+        container.innerHTML = `
+          <label>Cron Expression</label>
+          <input type="text" id="freq-cron-value" placeholder="*/30 * * * *" />
+          <p class="text-[10px] text-slate-600 mt-1 font-light">Standard 5-field cron: min hour dom month dow</p>
+          <div class="mt-2 text-[10px] text-slate-600 font-light space-y-0.5">
+            <div><code class="text-slate-500">*/15 * * * *</code> — Every 15 min</div>
+            <div><code class="text-slate-500">0 9 * * 1-5</code> — Weekdays at 9 AM</div>
+            <div><code class="text-slate-500">0 8 1 * *</code> — 1st of month at 8 AM</div>
+          </div>`;
+      }
+    };
+
+    // Save custom frequency
+    window._saveFreqCustom = function() {
+      const mode = document.getElementById('freq-custom-mode').value;
+      let value = null;
+
+      if (mode === 'interval') {
+        const num = parseInt(document.getElementById('freq-int-val')?.value || '1');
+        const unit = document.getElementById('freq-int-unit')?.value || 'h';
+        if (num > 0) value = `${num}${unit}`;
+      } else if (mode === 'days') {
+        const selectedBtns = document.querySelectorAll('.freq-day-btn.selected');
+        const dayIndices = Array.from(selectedBtns).map(b => parseInt(b.dataset.day));
+        const time = document.getElementById('freq-day-time')?.value || '09:00';
+        if (dayIndices.length > 0) {
+          const dayNames = ['mon','tue','wed','thu','fri','sat','sun'];
+          value = `days:${dayIndices.map(i => dayNames[i]).join(',')}@${time}`;
+        }
+      } else if (mode === 'datetime') {
+        const dt = document.getElementById('freq-dt-value')?.value;
+        if (dt) value = `once:${dt}`;
+      } else if (mode === 'cron') {
+        const expr = document.getElementById('freq-cron-value')?.value?.trim();
+        if (expr) value = `cron:${expr}`;
+      }
+
+      if (!value) {
+        showToast('Please fill in the reminder details', 'error');
+        return;
+      }
+
+      window._closeFreqCustomModal();
+      if (_freqActiveTaskId) {
+        window._setReminder(_freqActiveTaskId, value);
+      }
+    };
+
+    window._closeFreqCustomModal = function() {
+      if (_freqCustomModal) _freqCustomModal.classList.remove('open');
+    };
+
+    // Open the portal frequency picker, anchored to the trigger button
+    window._openFreqPicker = function(taskId, triggerEl) {
+      const portal = _ensureFreqPortal();
+      const currentValue = triggerEl?.dataset?.freqCurrent || '';
+
+      // If same task, toggle off
+      if (_freqActiveTaskId === taskId && portal.classList.contains('open')) {
+        _closeFreqPicker();
+        return;
+      }
+
+      _freqActiveTaskId = taskId;
+
+      // Build sectioned dropdown content
+      let html = '';
+      FREQ_SECTIONS.forEach((section, sIdx) => {
+        if (sIdx > 0) html += '<div class="freq-divider"></div>';
+        html += `<div class="freq-section-label">${section.icon || ''} ${section.label}</div>`;
+        section.options.forEach(opt => {
+          const isActive = currentValue === (opt.value || '');
+          html += `
+            <div class="freq-option ${isActive ? 'active' : ''}"
+                 onclick="event.stopPropagation(); window._setReminder('${taskId}', ${opt.value === null ? 'null' : `'${opt.value}'`})">
+              <span class="freq-dot" style="background:${opt.color}"></span>
+              <div class="flex-1">
+                <span>${opt.label}</span>
+                ${opt.sub ? `<span class="text-[9px] text-slate-600 ml-1">${opt.sub}</span>` : ''}
+              </div>
+              ${isActive ? '<svg class="w-3 h-3 text-indigo-400 flex-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>' : ''}
+            </div>`;
+        });
+      });
+
+      // Custom button at the bottom
+      html += '<div class="freq-divider"></div>';
+      html += `<div class="freq-custom-btn" onclick="event.stopPropagation(); window._openFreqCustomModal('${taskId}')">
+        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+        Custom...
+      </div>`;
+
+      // Show current custom value if it doesn't match a preset
+      if (currentValue && !ALL_FREQ_OPTIONS.find(o => o.value === currentValue)) {
+        html += `<div class="px-3 py-1.5 text-[9px] text-indigo-400/60 font-label">Active: <code>${currentValue}</code></div>`;
+      }
+
+      portal.innerHTML = html;
+
+      // Position portal relative to trigger
+      const rect = triggerEl.getBoundingClientRect();
+      const portalW = 220;
+      const portalH = Math.min(portal.scrollHeight || 400, 420);
+
+      // Prefer below-right, but flip if it would overflow
+      let top = rect.bottom + 6;
+      let left = rect.left - portalW + rect.width;
+
+      // Flip vertically if no room below
+      if (top + portalH > window.innerHeight - 20) {
+        top = rect.top - portalH - 6;
+      }
+      // Keep within horizontal bounds
+      if (left < 8) left = 8;
+      if (left + portalW > window.innerWidth - 8) left = window.innerWidth - portalW - 8;
+
+      portal.style.top = top + 'px';
+      portal.style.left = left + 'px';
+
+      // Force reflow, then open
+      portal.offsetHeight;
+      portal.classList.add('open');
+    };
+
+    function _closeFreqPicker() {
+      if (_freqPortal) _freqPortal.classList.remove('open');
+      _freqActiveTaskId = null;
+    }
+
+    window._openFreqCustomModal = function(taskId) {
+      _closeFreqPicker();
+      _freqActiveTaskId = taskId;
+      const modal = _ensureFreqCustomModal();
+      // Initialize fields
+      window._onFreqModeChange();
+      modal.classList.add('open');
+    };
+
+    window._setReminder = async function(taskId, interval) {
+      // Close portal
+      _closeFreqPicker();
+
+      // Optimistic local update
+      const taskEl = document.getElementById('task-' + taskId);
+      if (taskEl && interval) {
+        const label = REMINDER_LABELS[interval] || interval;
+        const existing = taskEl.querySelector('.reminder-badge-live');
+        if (existing) existing.textContent = label;
+      }
+
+      try {
+        const res = await fetch(`/data/tasks/${taskId}/reminder`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reminder_interval: interval }),
+        });
+        if (!res.ok) throw new Error('Failed');
+        const label = interval ? (REMINDER_LABELS[interval] || interval) : 'Default';
+        showToast(`Reminder: ${label}`, 'info');
+        setTimeout(fetchTimeline, 200);
+      } catch (e) {
+        showToast('Failed to update reminder', 'error');
+      }
+    };
+
+    // Close portal when clicking anywhere outside
+    document.addEventListener('click', (e) => {
+      if (_freqPortal && _freqPortal.classList.contains('open')
+          && !e.target.closest('.freq-portal')
+          && !e.target.closest('[data-freq-trigger]')) {
+        _closeFreqPicker();
+      }
+    });
+    // Close portal on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (_freqCustomModal && _freqCustomModal.classList.contains('open')) {
+          window._closeFreqCustomModal();
+        } else {
+          _closeFreqPicker();
+        }
+      }
+    });
+
+
+    // ═══════════════════════════════════════════
+    // EMAIL MENTAL PEACE — Inbox Simulation
+    // ═══════════════════════════════════════════
+
+    async function _renderEmailInbox(container) {
+      const EMAIL_CATEGORIES = {
+        high_priority: { label: 'High Priority', icon: '🔴', color: '#ef4444', bg: 'rgba(239,68,68,0.08)' },
+        paperwork:     { label: 'Paperwork',     icon: '📄', color: '#6366f1', bg: 'rgba(99,102,241,0.08)' },
+        read_later:    { label: 'Read Later',    icon: '📚', color: '#8b5cf6', bg: 'rgba(139,92,246,0.08)' },
+      };
+
+      let emails = [];
+      let counts = {};
+      try {
+        const [emailsRes, countsRes] = await Promise.all([
+          fetch('/data/emails'), fetch('/data/emails/counts')
+        ]);
+        emails = await emailsRes.json();
+        counts = await countsRes.json();
+      } catch(e) { /* emails API not available */ }
+
+      // Category tabs
+      let tabsHtml = Object.entries(EMAIL_CATEGORIES).map(([key, cat]) => {
+        const c = counts[key] || { total: 0, unread: 0 };
+        return `
+          <button class="email-tab flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-label
+                         ${key === 'high_priority' ? 'bg-white/[0.06] text-slate-300' : 'text-slate-500 hover:text-slate-400 hover:bg-white/[0.03]'}
+                         transition-colors cursor-pointer"
+                  data-email-cat="${key}"
+                  onclick="window._filterEmails('${key}')">
+            <span>${cat.icon}</span>
+            <span>${cat.label}</span>
+            ${c.unread > 0 ? `<span class="ml-1 px-1.5 py-px rounded-full text-[9px] font-medium" style="color:${cat.color};background:${cat.bg}">${c.unread}</span>` : ''}
+          </button>`;
+      }).join('');
+
+      // Email cards
+      let emailsHtml = '';
+      if (emails.length === 0) {
+        emailsHtml = `
+          <div class="text-center py-8">
+            <div class="text-[32px] mb-2">📭</div>
+            <div class="text-slate-500 text-[13px] font-light">Inbox zero. No emails to process.</div>
+            <div class="text-slate-700 text-[11px] mt-1">Connect Outlook via Neural Link to enable email triage.</div>
+          </div>`;
+      } else {
+        emails.slice(0, 10).forEach(em => {
+          const cat = EMAIL_CATEGORIES[em.category] || EMAIL_CATEGORIES.paperwork;
+          const unreadClass = em.is_read ? '' : 'email-unread';
+          // Ghost TL;DR: surgically injected at the TOP as a system annotation
+          const ghostTldr = em.tldr
+            ? `<div class="text-[11px] font-light mb-1.5" style="color:#adaaaa;letter-spacing:0.01em">[NEXUS: ${escapeHtml(em.tldr)}]</div>`
+            : '';
+          emailsHtml += `
+            <div class="email-card p-3 rounded-lg bg-white/[0.02] border border-white/[0.05] ${unreadClass}"
+                 onclick="window._markEmailRead('${em.id}')">
+              ${ghostTldr}
+              <div class="flex items-start justify-between gap-2">
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2">
+                    <span class="text-[12px] ${em.is_read ? 'text-slate-500' : 'text-slate-300'} font-medium truncate">${escapeHtml(em.subject)}</span>
+                  </div>
+                  <div class="text-[11px] text-slate-600 font-light mt-0.5">${escapeHtml(em.sender)}</div>
+                  ${em.preview ? `<div class="text-[11px] text-slate-600 font-light mt-1 line-clamp-2">${escapeHtml(em.preview)}</div>` : ''}
+                </div>
+                <span class="text-[10px] font-label px-1.5 py-px rounded-full flex-none" style="color:${cat.color};background:${cat.bg}">${cat.label}</span>
+              </div>
+            </div>`;
+        });
+      }
+
+      container.innerHTML = `
+        <div class="mb-4">
+          <h3 class="text-[11px] text-slate-500 uppercase tracking-widest font-label font-medium mb-3">Email Mental Peace</h3>
+          <div class="flex items-center gap-1.5 mb-3 overflow-x-auto">${tabsHtml}</div>
+          <div class="space-y-2">${emailsHtml}</div>
+        </div>`;
+    }
+
+    window._filterEmails = function(category) {
+      // Update active tab visual
+      document.querySelectorAll('.email-tab').forEach(tab => {
+        tab.classList.remove('bg-white/[0.06]', 'text-slate-300');
+        tab.classList.add('text-slate-500');
+        if (tab.dataset.emailCat === category) {
+          tab.classList.add('bg-white/[0.06]', 'text-slate-300');
+          tab.classList.remove('text-slate-500');
+        }
+      });
+      // Re-fetch filtered (for now, visual toggle only — full impl with Outlook)
+    };
+
+    window._markEmailRead = async function(emailId) {
+      try {
+        await fetch(`/data/emails/${emailId}/read`, { method: 'POST' });
+      } catch(e) { /* ignore */ }
+    };
+
+
+    // ═══════════════════════════════════════════
+    // COGNITIVE INFRASTRUCTURE PULSE — System Trace Heatmap
+    // ═══════════════════════════════════════════
+
+    function renderHeatmap() {
+      const grid = document.getElementById('heatmap-grid');
+      const label = document.getElementById('heatmap-label');
+      if (!grid) return;
+
+      const now = new Date();
+      const bars = [];
+
+      for (let i = 29; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+
+        let level;
+        if (i === 0) {
+          // Today: bind to actual real-time trace_count from WebSocket events
+          level = state.traceCount;
+        } else {
+          // Historical: deterministic seed tied to the calendar date
+          // This ensures consistent visual on reload while varying across days
+          const seed = d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+          const raw = ((seed * 9301 + 49297) % 233280) / 233280; // 0..1
+          // Weighted distribution: ~30% chance of 0 (idle day)
+          level = raw < 0.3 ? 0 : Math.floor(raw * 18);
+        }
+        bars.push({ date: d, level });
+      }
+
+      const maxLevel = Math.max(...bars.map(b => b.level), 1);
+
+      grid.innerHTML = bars.map(bar => {
+        const isToday = bar.date.toDateString() === now.toDateString();
+        const dateStr = bar.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+        if (bar.level === 0) {
+          // ── Empty state: dashed outline = "System Idle / Deep Work Protect" ──
+          return `<div class="heatmap-cell" style="height:4px;flex:1;border:1px dashed rgba(99,102,241,0.15);background:transparent;border-radius:2px" title="${dateStr}: Idle — Deep Work Protect"></div>`;
+        }
+
+        const height = Math.max(6, (bar.level / maxLevel) * 36);
+        const intensity = bar.level / maxLevel;
+        const alpha = 0.20 + intensity * 0.55;
+        const color = isToday
+          ? `rgba(99,102,241,${alpha})`
+          : `rgba(99,102,241,${alpha * 0.7})`;
+        const todayBorder = isToday ? 'border: 1px solid rgba(99,102,241,0.35);' : '';
+        return `<div class="heatmap-cell" style="height:${height}px;background:${color};flex:1;${todayBorder}transition:all 0.15s ease" title="${dateStr}: ${bar.level} traces"></div>`;
+      }).join('');
+
+      const activeDays = bars.filter(b => b.level > 0).length;
+      const totalTraces = bars.reduce((sum, b) => sum + b.level, 0);
+      label.textContent = `${totalTraces} traces · ${activeDays} active days`;
+    }
+
+
+    // ═══════════════════════════════════════════
+    // DATE HELPERS
+    // ═══════════════════════════════════════════
+
+    function formatDateLabel(dateStr) {
+      if (!dateStr || dateStr === 'No date') return 'Unscheduled';
+      try {
+        const d = new Date(dateStr + 'T00:00:00');
+        const today = new Date(); today.setHours(0,0,0,0);
+        const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+        if (d.getTime() === today.getTime()) return 'Today';
+        if (d.getTime() === tomorrow.getTime()) return 'Tomorrow';
+        return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      } catch { return dateStr; }
+    }
+
+    function formatTimeRange(start, end) {
+      try {
+        const s = new Date(start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        const e = new Date(end).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        return `${s} – ${e}`;
+      } catch { return ''; }
+    }
+
+    function formatShortDate(dateStr) {
+      if (!dateStr) return '';
+      try {
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      } catch { return dateStr; }
+    }
+
+
+    // ═══════════════════════════════════════════
+    // EVENT LISTENERS
+    // ═══════════════════════════════════════════
+
+    cmdInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendChat(cmdInput.value);
+      }
+    });
+
+    // Show urgency HUD when user starts typing task-like input
+    cmdInput.addEventListener('input', () => {
+      const val = cmdInput.value.trim();
+      if (val.length >= 3 && !state.isProcessing) {
+        // Heuristic: show HUD for task-like inputs (contains action words)
+        const taskSignals = /\b(task|todo|remind|schedule|deadline|plan|create|add|set|book|call|send|write|finish|complete|prepare|buy|pick)\b/i;
+        if (taskSignals.test(val)) {
+          _showUrgencyHud();
+        }
+      } else if (val.length === 0) {
+        _hideUrgencyHud();
+      }
+    });
+
+    // Global keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      // Escape: close overlays first, then blur command bar
+      if (e.key === 'Escape') {
+        if (_settingsOpen) { closeSettings(); return; }
+        if (_activeNote) { closeDoc(); return; }
+        cmdInput.blur();
+        return;
+      }
+      // "/" to focus command bar (only when overlays are closed)
+      if (e.key === '/' && document.activeElement !== cmdInput && !_activeNote && !_settingsOpen) {
+        e.preventDefault();
+        cmdInput.focus();
+      }
+    });
+
+
+    // ═══════════════════════════════════════════
+    // INIT
+    // ═══════════════════════════════════════════
+
+    async function init() {
+      connectWS();
+      updateNarration('NEXUS online. Your executive infrastructure is ready.', 'primary_agent');
+      await Promise.all([fetchTimeline(), fetchNotes(), fetchHealth()]);
+      renderHeatmap();
+
+      // Auto-open Neural Link if returning from OAuth callback
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('auth') && params.get('status') === 'connected') {
+        // Clean URL without reload
+        window.history.replaceState({}, '', '/');
+        // Brief delay to let everything render, then open Neural Link with success toast
+        setTimeout(() => {
+          const service = params.get('auth') === 'microsoft' ? 'Microsoft Outlook' : params.get('auth');
+          _showToast(`${service} connected successfully!`, 'success');
+          window._openSettings();
+        }, 500);
+      }
+    }
+
+    // Toast helper for auth callbacks
+    function _showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+      const colors = {
+        success: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+        error: 'border-red-500/30 bg-red-500/10 text-red-300',
+        info: 'border-indigo-500/30 bg-indigo-500/10 text-indigo-300',
+      };
+      const toast = document.createElement('div');
+      toast.className = `pointer-events-auto px-4 py-3 rounded-xl border ${colors[type] || colors.info} text-[12px] font-medium backdrop-blur-xl shadow-lg transition-all duration-300 opacity-0 translate-y-2`;
+      toast.textContent = message;
+      container.appendChild(toast);
+      requestAnimationFrame(() => { toast.style.opacity = '1'; toast.style.transform = 'translateY(0)'; });
+      setTimeout(() => {
+        toast.style.opacity = '0'; toast.style.transform = 'translateY(-8px)';
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+
+    init();
+
+  })();
+  </script>
+</body>
+</html>

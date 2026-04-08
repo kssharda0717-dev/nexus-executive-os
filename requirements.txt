@@ -1,0 +1,42 @@
+# ─────────────────────────────────────────────────────────────
+# NEXUS Executive OS — Python Dependencies
+# Install:  pip install -r requirements.txt
+# Tested on Python 3.11+
+# ─────────────────────────────────────────────────────────────
+
+# ── Core API Framework ────────────────────────────────────────
+fastapi==0.135.2
+uvicorn[standard]==0.42.0
+websockets==16.0
+python-multipart==0.0.22
+sse-starlette==3.3.4
+starlette==1.0.0
+
+# ── Database ──────────────────────────────────────────────────
+aiosqlite==0.22.1
+
+# ── Google Gemini AI ──────────────────────────────────────────
+google-genai==1.70.0
+
+# ── MCP Protocol ──────────────────────────────────────────────
+mcp==1.26.0
+
+# ── Security & Authentication ─────────────────────────────────
+bcrypt==5.0.0
+PyJWT==2.12.1
+cryptography==46.0.6
+slowapi==0.1.9
+
+# ── HTTP Client ───────────────────────────────────────────────
+httpx==0.28.1
+
+# ── Document Generation (PDF / DOCX / XLSX export) ───────────
+reportlab==4.4.10
+python-docx==1.2.0
+pandas==3.0.2
+openpyxl==3.1.5
+
+# ── Utilities ─────────────────────────────────────────────────
+pydantic==2.12.5
+python-dotenv==1.2.2
+apscheduler==3.11.2

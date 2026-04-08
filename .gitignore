@@ -1,0 +1,75 @@
+# ─────────────────────────────────────────────────────────────
+# NEXUS Executive OS — .gitignore
+# ─────────────────────────────────────────────────────────────
+
+# ── Secrets & Environment ─────────────────────────────────────
+.env
+.env.local
+.env.production
+*.env
+
+# ── Database & Persistent Data ────────────────────────────────
+# Exclude all database files, secrets, and logs — keep directory structure
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+data/*.log
+data/.jwt_secret
+# Exclude user-generated exports but keep the directory
+data/exports/*
+!data/exports/.gitkeep
+
+# ── Python Artifacts ──────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+.Python
+
+# ── Virtual Environments ──────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ── Testing & Coverage ────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+coverage.xml
+*.cover
+*.py,cover
+
+# ── IDE & Editor ─────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── macOS ─────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ── Claude Code Metadata ──────────────────────────────────────
+.claude/
+
+# ── Logs ──────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Build & Distribution ──────────────────────────────────────
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# ── Exports (user-generated files) ────────────────────────────
+data/exports/
+
+# ── Docker ────────────────────────────────────────────────────
+# (Dockerfile and docker-compose.yml ARE committed)

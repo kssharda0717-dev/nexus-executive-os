@@ -1,0 +1,47 @@
+# ── NEXUS Docker Compose ───────────────────────────────
+# Local development & Cloud Run deployment configuration.
+#
+# Usage:
+#   docker-compose up --build          # Build and run locally
+#   docker-compose up -d               # Run in background
+#   docker-compose logs -f nexus       # Tail logs
+#   docker-compose down                # Stop and remove
+#
+# For Cloud Run deployment:
+#   gcloud builds submit --tag gcr.io/YOUR_PROJECT/nexus
+#   gcloud run deploy nexus --image gcr.io/YOUR_PROJECT/nexus \
+#     --set-env-vars GEMINI_API_KEY=your-key \
+#     --allow-unauthenticated --port 8080
+
+services:
+  nexus:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nexus-api
+    ports:
+      - "${PORT:-8080}:${PORT:-8080}"
+    environment:
+      # ── Required ──
+      - GEMINI_API_KEY=${GEMINI_API_KEY:?Set GEMINI_API_KEY in .env or environment}
+
+      # ── Server ──
+      - HOST=0.0.0.0
+      - PORT=${PORT:-8080}
+
+      # ── Python ──
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Persist SQLite database across container restarts (dev only)
+      - nexus-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  nexus-data:
+    driver: local
